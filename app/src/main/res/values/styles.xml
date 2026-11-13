@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppLight" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">#2E7D5B</item>
+        <item name="android:colorPrimaryDark">#F4F6F3</item>
+        <item name="android:colorAccent">#2E7D5B</item>
+        <item name="android:windowBackground">@color/bg_light</item>
+        <item name="android:statusBarColor">#F4F6F3</item>
+    </style>
+    <style name="AppDark" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">#6FCF97</item>
+        <item name="android:colorPrimaryDark">#0F1412</item>
+        <item name="android:colorAccent">#6FCF97</item>
+        <item name="android:windowBackground">@color/bg_dark</item>
+        <item name="android:statusBarColor">#0F1412</item>
+    </style>
+    <style name="AppBlack" parent="AppDark">
+        <item name="android:windowBackground">@color/bg_black</item>
+        <item name="android:statusBarColor">#000000</item>
+    </style>
+    <!-- Small pop-up windows over other apps (save prompt). -->
+    <style name="AppTranslucent" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorAccent">#2E7D5B</item>
+        <item name="android:colorPrimary">#2E7D5B</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+    <style name="AppTranslucentDark" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorAccent">#6FCF97</item>
+        <item name="android:colorPrimary">#6FCF97</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>

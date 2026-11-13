@@ -1,0 +1,21 @@
+Grove Vault
+Copyright (C) 2026 Grove Vault contributors
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version. See LICENSE.
+
+All code in this project is original. It was written from a feature list made by looking at how
+SafeInCloud behaves; no SafeInCloud code, artwork, icons or text are included. Algorithms follow
+their public specifications: AES-GCM (NIST SP 800-38D), PBKDF2 (RFC 8018), Argon2 (RFC 9106),
+BLAKE2b (RFC 7693), ChaCha20 (RFC 8439), Salsa20 (D. J. Bernstein), TOTP (RFC 6238), and the
+publicly documented KeePass KDBX 3.1 / 4.x file formats.
+
+SafeInCloud database support is implemented from the file layout for interoperability (moving your own data
+between apps). SafeInCloud is a trademark of its owner; Grove Vault is not affiliated with it.
+
+res/raw/privileged_browsers.json lists browsers allowed to make website passkey requests. It combines Google's
+published privileged-apps list with the community list maintained in the Bitwarden Android project (GPL-3.0).
+
+The only dependency of the Android app is the Android framework. The Windows app bundles an OpenJDK runtime
+(Eclipse Temurin, GPLv2 with Classpath Exception; licences in runtime/legal).

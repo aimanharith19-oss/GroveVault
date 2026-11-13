@@ -1,0 +1,56 @@
+package org.grove.vault.core;
+
+/** Word list for passphrases (original list, common English words). */
+final class Words {
+    private Words() {}
+
+    static final String[] LIST = {
+            "able", "acid", "acorn", "actor", "adapt", "adobe", "agent", "alarm", "album", "alert",
+            "alien", "alley", "alpha", "amber", "amigo", "ample", "angel", "anger", "ankle", "apple",
+            "april", "apron", "arena", "armor", "arrow", "aspen", "atlas", "attic", "audio", "august",
+            "aunt", "autumn", "avid", "awake", "award", "axis", "bacon", "badge", "bagel", "baker",
+            "balmy", "bamboo", "banjo", "barn", "basil", "batch", "beach", "beard", "beast", "bench",
+            "berry", "bingo", "birch", "bison", "blade", "blank", "blaze", "blend", "bliss", "block",
+            "bloom", "blue", "board", "boat", "bonus", "boost", "booth", "boxer", "brave", "bread",
+            "brick", "bride", "brief", "brook", "broom", "brush", "bubble", "buddy", "bugle", "bunny",
+            "cabin", "cable", "cactus", "camel", "camp", "candy", "canoe", "canvas", "cargo", "carol",
+            "carpet", "cedar", "chalk", "charm", "chess", "chief", "chili", "choir", "cider", "cinema",
+            "citrus", "civic", "claim", "clam", "clay", "cliff", "climb", "clock", "cloud", "clover",
+            "coach", "coast", "cobra", "cocoa", "comet", "coral", "cosmic", "cotton", "couch", "cougar",
+            "crane", "crisp", "crown", "crumb", "crystal", "cube", "curry", "cycle", "daisy", "dance",
+            "dawn", "delta", "denim", "depot", "desert", "diary", "dingo", "disco", "dock", "dolphin",
+            "donut", "dove", "dragon", "drift", "drum", "dune", "dusk", "eagle", "earth", "easel",
+            "echo", "eclipse", "elbow", "elder", "elm", "ember", "emerald", "engine", "epic", "equal",
+            "ethic", "event", "fable", "fabric", "falcon", "fancy", "farm", "feast", "fern", "ferry",
+            "fiber", "fiddle", "field", "fig", "final", "flame", "flash", "fleet", "flint", "flute",
+            "focus", "foggy", "forest", "forge", "fossil", "fox", "frame", "frost", "fruit", "fudge",
+            "galaxy", "garden", "garlic", "gecko", "gem", "giant", "ginger", "glacier", "glade", "glass",
+            "globe", "glory", "goat", "gold", "gopher", "grape", "gravy", "green", "grove", "guitar",
+            "gust", "habit", "hammer", "harbor", "harp", "hazel", "heart", "hedge", "helmet", "hero",
+            "hiker", "hippo", "honey", "hoop", "horizon", "hotel", "humble", "husky", "icicle", "igloo",
+            "index", "indigo", "inlet", "iris", "island", "ivory", "jacket", "jaguar", "jam", "jasmine",
+            "jelly", "jewel", "jockey", "jolly", "judge", "juice", "jumbo", "jungle", "kayak", "kernel",
+            "kettle", "kiwi", "koala", "ladder", "lagoon", "lamp", "lantern", "laser", "latte", "lava",
+            "lemon", "level", "lilac", "lime", "linen", "lion", "lizard", "llama", "lobster", "locket",
+            "lotus", "lucky", "lunar", "lunch", "lyric", "magnet", "mango", "maple", "marble", "market",
+            "marsh", "mason", "meadow", "melon", "mentor", "merit", "metro", "mint", "mirror", "mocha",
+            "model", "monkey", "moose", "mosaic", "moss", "motor", "mural", "museum", "nacho", "napkin",
+            "nectar", "needle", "nest", "nickel", "night", "ninja", "noble", "noodle", "north", "novel",
+            "nugget", "oasis", "ocean", "olive", "omega", "onion", "opal", "orbit", "orchid", "otter",
+            "oven", "owl", "oyster", "paddle", "palm", "panda", "paper", "parade", "parrot", "pasta",
+            "peach", "pearl", "pebble", "pecan", "pepper", "piano", "pickle", "pilot", "pine", "pixel",
+            "pizza", "planet", "plaza", "plum", "polar", "pony", "poppy", "portal", "potato", "prism",
+            "pulse", "puma", "puzzle", "quail", "quartz", "quest", "quilt", "rabbit", "radar", "radio",
+            "rain", "ranch", "raven", "razor", "reef", "relay", "rhino", "ribbon", "ridge", "river",
+            "robin", "rocket", "rodeo", "rose", "ruby", "rumba", "saddle", "saga", "salmon", "salsa",
+            "sand", "satin", "scarf", "scout", "season", "shadow", "shell", "sherpa", "shore", "silk",
+            "silver", "sketch", "slate", "sloth", "smile", "snow", "solar", "sonic", "spark", "spice",
+            "spider", "spoon", "spring", "squid", "stamp", "star", "steam", "stone", "storm", "straw",
+            "sugar", "summit", "sunny", "swamp", "swan", "syrup", "table", "tango", "teapot", "tempo",
+            "thunder", "tiger", "timber", "toast", "topaz", "torch", "tower", "trail", "tulip", "tundra",
+            "turtle", "twig", "umbrella", "unicorn", "urban", "valley", "vapor", "velvet", "venus", "violet",
+            "viper", "vivid", "voice", "volcano", "voyage", "wafer", "waffle", "walnut", "walrus", "wave",
+            "willow", "window", "winter", "wizard", "wolf", "wonder", "yacht", "yard", "yeti", "yogurt",
+            "zebra", "zenith", "zesty", "zinc", "zipper", "zone"
+    };
+}
