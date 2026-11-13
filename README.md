@@ -6,6 +6,10 @@ An offline, open-source password manager for **Android and Windows**. It has the
 * **Requires:** Android 8.0+ (API 26); targets Android 14 (API 34)
 * **Privacy:** no ads, no trackers, no analytics, no accounts. The only network use is downloading website icons (can be turned off); vault data is never sent anywhere. The only dependency is the Android framework.
 
+## Download
+
+[**GroveVault-1.4.2.apk**](apk/GroveVault-1.4.2.apk) (Android 8.0+). Installs over earlier versions.
+
 ## Features
 
 ### Vault and cards
