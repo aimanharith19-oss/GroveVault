@@ -365,7 +365,7 @@ public final class Ui {
             return;
         }
         View sp = new View(a);
-        bar.addView(sp, lpw(1));
+        bar.addView(sp, new LinearLayout.LayoutParams(0, 1, 1)); // a bare View with WRAP height would fill the screen
         for (View v : actions) {
             if (v.getParent() instanceof ViewGroup) ((ViewGroup) v.getParent()).removeView(v);
             if (v instanceof TextView) {
