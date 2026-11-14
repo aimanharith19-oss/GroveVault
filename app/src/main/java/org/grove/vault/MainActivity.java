@@ -252,6 +252,10 @@ public class MainActivity extends BaseActivity {
         i = (i + dir + pivotKeys.size()) % pivotKeys.size();
         filter = pivotKeys.get(i);
         refresh();
+        View title = header == null ? null : header.findViewWithTag("grove_title");
+        if (title != null) // panorama parallax: the big title slides slower than the content
+            title.animate().translationX(-Math.min(pivotKeys.indexOf(filter) * Ui.dp(this, 70), Ui.dp(this, 280))).setDuration(450)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator(2f)).start();
         if (cardsView != null) {
             cardsView.setSelection(0);
             cardsView.setTranslationX(dir * Ui.dp(this, 60));

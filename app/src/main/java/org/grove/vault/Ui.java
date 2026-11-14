@@ -333,22 +333,26 @@ public final class Ui {
      * back=false marks the hub page, which gets the bigger "panorama" title.
      */
     public static LinearLayout topBar(final Activity a, String title, boolean back, View... actions) {
+        // same header as Grove Music: "GROVE VAULT" 15sp semibold + 56sp light page title; the hub gets the
+        // 84sp panorama title that runs off the right edge
         LinearLayout h = vertical(a);
-        h.setPadding(dp(a, 20), dp(a, 10), dp(a, 20), dp(a, 4));
+        h.setClipChildren(true);
+        h.setPadding(back ? dp(a, 20) : dp(a, 12), back ? dp(a, 14) : dp(a, 4), dp(a, 0), dp(a, 4));
         if (back) {
-            TextView app = text(a, "GROVE VAULT", 14, TEXT, true);
-            app.setLetterSpacing(0.06f);
+            TextView app = text(a, "GROVE VAULT", 15, TEXT, true);
             h.addView(app);
         }
         if (title != null && title.length() > 0) {
-            TextView t = text(a, title.toLowerCase(), back ? 42 : 48, TEXT, false);
+            float sp = back ? 56 : 84;
+            TextView t = text(a, title.toLowerCase(), sp, TEXT, false);
             t.setTypeface(LIGHT);
             t.setSingleLine(true);
-            if (back) t.setEllipsize(android.text.TextUtils.TruncateAt.END); // hub title runs off the edge, like a panorama
-            t.setLetterSpacing(-0.03f);
+            t.setHorizontallyScrolling(true);
+            t.setLetterSpacing(back ? -0.01f : -3f / 84f);
             t.setIncludeFontPadding(false);
-            t.setPadding(0, dp(a, back ? 0 : 6), 0, dp(a, 6));
-            h.addView(t);
+            t.setPadding(0, 0, 0, dp(a, 8));
+            t.setTag("grove_title");
+            h.addView(t, lp(MATCH, WRAP));
         }
         appBar(a, actions);
         return h;

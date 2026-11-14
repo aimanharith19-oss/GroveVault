@@ -95,11 +95,10 @@ public class LockActivity extends Activity {
         c.addView(clock);
         TextView date = Ui.text(this, new java.text.SimpleDateFormat("EEEE, MMMM d", java.util.Locale.getDefault()).format(now).toLowerCase(), 22, Ui.TEXT, false);
         c.addView(date);
-        TextView app = Ui.text(this, "GROVE VAULT", 14, Ui.TEXT, true);
-        app.setLetterSpacing(0.06f);
+        TextView app = Ui.text(this, "GROVE VAULT", 15, Ui.TEXT, true);
         app.setPadding(0, Ui.dp(this, 36), 0, 0);
         c.addView(app);
-        TextView name = Ui.text(this, Store.exists(this) ? "unlock" : "welcome", 46, Ui.TEXT, false);
+        TextView name = Ui.text(this, Store.exists(this) ? "unlock" : "welcome", 56, Ui.TEXT, false);
         name.setTypeface(Ui.LIGHT);
         name.setPadding(0, 0, 0, Ui.dp(this, 10));
         c.addView(name);
