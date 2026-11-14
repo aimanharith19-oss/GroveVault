@@ -630,6 +630,7 @@ public final class Ui {
         d.setContentView(l);
         if (d.getWindow() != null) {
             d.getWindow().setGravity(Gravity.BOTTOM);
+            d.getWindow().setWindowAnimations(R.style.MetroBottomAnim);
             d.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         }
         d.show();

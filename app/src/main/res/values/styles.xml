@@ -41,12 +41,23 @@
     <style name="MetroDialogDark" parent="android:Theme.Material.Dialog.Alert">
         <item name="android:windowBackground">@color/metro_dialog_dark</item>
         <item name="android:colorAccent">#60A917</item>
-        <item name="android:backgroundDimAmount">0.75</item>
+        <item name="android:backgroundDimAmount">0.55</item>
+        <item name="android:windowAnimationStyle">@style/MetroTopAnim</item>
         <item name="android:textColorPrimary">#FFFFFF</item>
     </style>
     <style name="MetroDialogLight" parent="android:Theme.Material.Light.Dialog.Alert">
         <item name="android:windowBackground">@color/metro_dialog_light</item>
         <item name="android:colorAccent">#60A917</item>
-        <item name="android:backgroundDimAmount">0.6</item>
+        <item name="android:backgroundDimAmount">0.45</item>
+        <item name="android:windowAnimationStyle">@style/MetroTopAnim</item>
+    </style>
+    <!-- Message boxes drop down from the top, the app-bar menu rises from the bottom (Windows Phone). -->
+    <style name="MetroTopAnim">
+        <item name="android:windowEnterAnimation">@anim/metro_top_in</item>
+        <item name="android:windowExitAnimation">@anim/metro_top_out</item>
+    </style>
+    <style name="MetroBottomAnim">
+        <item name="android:windowEnterAnimation">@anim/metro_bottom_in</item>
+        <item name="android:windowExitAnimation">@anim/metro_bottom_out</item>
     </style>
 </resources>
