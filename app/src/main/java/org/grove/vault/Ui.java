@@ -132,6 +132,7 @@ public final class Ui {
     public static void tilt(final View v) {
         v.setOnTouchListener(new View.OnTouchListener() {
             public boolean onTouch(View view, android.view.MotionEvent e) {
+                if (!view.isClickable()) return false; // would never get the UP event and stay tilted
                 switch (e.getActionMasked()) {
                     case android.view.MotionEvent.ACTION_DOWN: {
                         float w = Math.max(1, view.getWidth()), h = Math.max(1, view.getHeight());
@@ -340,7 +341,7 @@ public final class Ui {
             h.addView(app);
         }
         if (title != null && title.length() > 0) {
-            TextView t = text(a, title.toLowerCase(), back ? 46 : 60, TEXT, false);
+            TextView t = text(a, title.toLowerCase(), back ? 42 : 48, TEXT, false);
             t.setTypeface(LIGHT);
             t.setSingleLine(true);
             if (back) t.setEllipsize(android.text.TextUtils.TruncateAt.END); // hub title runs off the edge, like a panorama
@@ -502,7 +503,7 @@ public final class Ui {
 
     /** Pivot header: big thin lowercase word; the current one is bright, the others faded. */
     public static TextView chip(Context c, String label, boolean selected, View.OnClickListener l) {
-        TextView t = text(c, label.toLowerCase(), 30, TEXT, false);
+        TextView t = text(c, label.toLowerCase(), 24, TEXT, false);
         t.setTypeface(LIGHT);
         t.setAlpha(selected ? 1f : 0.4f);
         t.setPadding(dp(c, 2), 0, dp(c, 18), dp(c, 2));

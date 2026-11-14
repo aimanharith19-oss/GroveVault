@@ -82,6 +82,7 @@ public class MainActivity extends BaseActivity {
             }
         });
         LinearLayout bar = Ui.topBar(this, "grove vault", false, addBtn, searchBtn, viewBtn, menuBtn);
+        header = bar;
         root.addView(bar);
         search = Ui.edit(this, "Search cards", InputType.TYPE_CLASS_TEXT);
         search.setVisibility(View.GONE);
@@ -111,7 +112,7 @@ public class MainActivity extends BaseActivity {
             }
         });
         chips = Ui.horizontal(this);
-        chips.setPadding(Ui.dp(this, 18), 0, Ui.dp(this, 12), Ui.dp(this, 10));
+        chips.setPadding(Ui.dp(this, 18), 0, Ui.dp(this, 12), Ui.dp(this, 6));
         root.addView(Ui.hscroll(this, chips));
 
         frame = new FrameLayout(this);
@@ -125,6 +126,19 @@ public class MainActivity extends BaseActivity {
         frame.addView(empty, new FrameLayout.LayoutParams(Ui.MATCH, Ui.MATCH));
 
     }
+
+    private View header;
+
+    /** Hides the big title while scrolled down so more cards fit on screen. */
+    private final android.widget.AbsListView.OnScrollListener collapse = new android.widget.AbsListView.OnScrollListener() {
+        public void onScrollStateChanged(android.widget.AbsListView v, int s) {}
+        public void onScroll(android.widget.AbsListView v, int first, int visible, int total) {
+            if (header == null) return;
+            if (first > 1 && header.getVisibility() == View.VISIBLE) header.setVisibility(View.GONE);
+            else if (first == 0 && header.getVisibility() != View.VISIBLE && (v.getChildCount() == 0 || v.getChildAt(0).getTop() >= v.getPaddingTop()))
+                header.setVisibility(View.VISIBLE);
+        }
+    };
 
     private FrameLayout frame;
     private android.widget.AbsListView cardsView;
@@ -146,10 +160,11 @@ public class MainActivity extends BaseActivity {
         } else {
             ListView l = new ListView(this);
             l.setDivider(null);
-            l.setPadding(0, 0, 0, Ui.dp(this, 88));
+            l.setPadding(0, 0, 0, Ui.dp(this, 12));
             v = l;
         }
         v.setClipToPadding(false);
+        v.setOnScrollListener(collapse);
         v.setAdapter(adapter);
         v.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             public void onItemClick(AdapterView<?> p, View view, int pos, long id) { open(shown.get(pos)); }
@@ -422,18 +437,18 @@ public class MainActivity extends BaseActivity {
             Card c = shown.get(pos);
             if (Prefs.p(MainActivity.this).getBoolean("grid", false)) return tile(c);
             LinearLayout r = Ui.horizontal(MainActivity.this);
-            r.setPadding(Ui.dp(MainActivity.this, 20), Ui.dp(MainActivity.this, 7), Ui.dp(MainActivity.this, 16), Ui.dp(MainActivity.this, 7));
+            r.setPadding(Ui.dp(MainActivity.this, 20), Ui.dp(MainActivity.this, 5), Ui.dp(MainActivity.this, 16), Ui.dp(MainActivity.this, 5));
             r.setGravity(Gravity.CENTER_VERTICAL);
-            r.addView(Ui.cardIcon(MainActivity.this, c, 54));
+            r.addView(Ui.cardIcon(MainActivity.this, c, 46));
             LinearLayout tx = Ui.vertical(MainActivity.this);
             tx.setPadding(Ui.dp(MainActivity.this, 14), 0, Ui.dp(MainActivity.this, 8), 0);
-            TextView t = Ui.text(MainActivity.this, c.title.length() == 0 ? "(untitled)" : c.title, 21, Ui.TEXT, false);
+            TextView t = Ui.text(MainActivity.this, c.title.length() == 0 ? "(untitled)" : c.title, 19, Ui.TEXT, false);
             t.setSingleLine(true);
             t.setEllipsize(android.text.TextUtils.TruncateAt.END);
             tx.addView(t);
             String sub = c.template ? c.fields.size() + " fields" : c.subtitle();
             if (sub.length() > 0) {
-                TextView s = Ui.text(MainActivity.this, sub, 14, Ui.SUB, false);
+                TextView s = Ui.text(MainActivity.this, sub, 13, Ui.SUB, false);
                 s.setSingleLine(true);
                 s.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 tx.addView(s);
