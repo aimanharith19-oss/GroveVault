@@ -124,6 +124,8 @@ public class MainActivity extends BaseActivity {
         empty.setGravity(Gravity.CENTER);
         empty.setPadding(Ui.dp(this, 40), 0, Ui.dp(this, 40), 0);
         frame.addView(empty, new FrameLayout.LayoutParams(Ui.MATCH, Ui.MATCH));
+        empty.setOnTouchListener(swipeListener());
+        empty.setClickable(true);
 
     }
 
@@ -165,6 +167,7 @@ public class MainActivity extends BaseActivity {
         }
         v.setClipToPadding(false);
         v.setOnScrollListener(collapse);
+        v.setOnTouchListener(swipeListener());
         v.setAdapter(adapter);
         v.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             public void onItemClick(AdapterView<?> p, View view, int pos, long id) { open(shown.get(pos)); }
@@ -196,6 +199,7 @@ public class MainActivity extends BaseActivity {
             if (c.favorite) fav++;
         }
         chips.removeAllViews();
+        pivotKeys.clear();
         addChip("All " + active.size(), "all");
         if (fav > 0) addChip("★ Favourites", "fav");
         v.sortLabels();
@@ -238,7 +242,57 @@ public class MainActivity extends BaseActivity {
         } else empty.setVisibility(View.GONE);
     }
 
+    private final java.util.List<String> pivotKeys = new java.util.ArrayList<String>();
+
+    /** Pivot swipe: left goes to the next filter, right to the previous one (wraps around like Windows Phone). */
+    private void swipePivot(int dir) {
+        if (pivotKeys.isEmpty()) return;
+        int i = pivotKeys.indexOf(filter);
+        if (i < 0) i = 0;
+        i = (i + dir + pivotKeys.size()) % pivotKeys.size();
+        filter = pivotKeys.get(i);
+        refresh();
+        if (cardsView != null) {
+            cardsView.setSelection(0);
+            cardsView.setTranslationX(dir * Ui.dp(this, 60));
+            cardsView.setAlpha(0f);
+            cardsView.animate().translationX(0).alpha(1f).setDuration(220).start();
+        }
+        final View sel = chips.getChildAt(i);
+        if (sel != null) chips.post(new Runnable() {
+            public void run() { ((android.widget.HorizontalScrollView) chips.getParent()).smoothScrollTo(Math.max(0, sel.getLeft() - Ui.dp(MainActivity.this, 18)), 0); }
+        });
+    }
+
+    private android.view.GestureDetector swipe;
+
+    private android.view.View.OnTouchListener swipeListener() {
+        swipe = new android.view.GestureDetector(this, new android.view.GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onFling(android.view.MotionEvent a, android.view.MotionEvent b, float vx, float vy) {
+                if (a == null || b == null) return false;
+                float dx = b.getX() - a.getX(), dy = b.getY() - a.getY();
+                if (Math.abs(dx) < Ui.dp(MainActivity.this, 80) || Math.abs(dx) < Math.abs(dy) * 1.5f || Math.abs(vx) < 400) return false;
+                swipePivot(dx < 0 ? 1 : -1);
+                return true;
+            }
+        });
+        return new android.view.View.OnTouchListener() {
+            public boolean onTouch(View v, android.view.MotionEvent e) {
+                if (swipe.onTouchEvent(e) && e.getActionMasked() == android.view.MotionEvent.ACTION_UP) {
+                    android.view.MotionEvent c = android.view.MotionEvent.obtain(e);
+                    c.setAction(android.view.MotionEvent.ACTION_CANCEL); // a swipe must not also open the card under the finger
+                    v.onTouchEvent(c);
+                    c.recycle();
+                    return true;
+                }
+                return false; // still let the list scroll and handle taps
+            }
+        };
+    }
+
     private void addChip(String label, final String key) {
+        pivotKeys.add(key);
         chips.addView(Ui.chip(this, label, filter.equals(key), new View.OnClickListener() {
             public void onClick(View v) {
                 filter = key;
