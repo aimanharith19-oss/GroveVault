@@ -141,7 +141,6 @@ public class EditActivity extends BaseActivity {
             final int idx = i;
             View dot = new View(this);
             android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
-            g.setShape(android.graphics.drawable.GradientDrawable.OVAL);
             g.setColor(Ui.CARD_COLORS[i]);
             if (i == work.color) g.setStroke(Ui.dp(this, 3), Ui.TEXT);
             dot.setBackground(g);

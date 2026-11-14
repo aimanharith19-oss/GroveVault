@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="bg_light">#F4F6F3</color>
-    <color name="bg_dark">#0F1412</color>
+    <color name="bg_dark">#000000</color>
     <color name="bg_black">#000000</color>
     <color name="icon_bg">#1F4D3A</color>
+    <color name="metro_dialog_dark">#1F1F1F</color>
+    <color name="metro_dialog_light">#FFFFFF</color>
 </resources>

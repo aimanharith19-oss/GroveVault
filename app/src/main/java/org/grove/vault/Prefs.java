@@ -16,7 +16,9 @@ public final class Prefs {
     public static int clipboardSeconds(Context c) { return p(c).getInt("clip_secs", 30); }
     public static boolean allowScreenshots(Context c) { return p(c).getBoolean("screenshots", false); }
     /** 0 = system, 1 = light, 2 = dark, 3 = black (AMOLED). */
-    public static int theme(Context c) { return p(c).getInt("theme", 0); }
+    public static int theme(Context c) { return p(c).getInt("theme", 2); }
+    /** Windows Phone accent colour (default: green). */
+    public static int accent(Context c) { return p(c).getInt("accent", 0xFF60A917); }
     /** 0 = title, 1 = recently modified, 2 = recently created. */
     public static int sort(Context c) { return p(c).getInt("sort", 0); }
     public static boolean favoritesOnTop(Context c) { return p(c).getBoolean("fav_top", true); }

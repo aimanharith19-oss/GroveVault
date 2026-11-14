@@ -142,10 +142,35 @@ public class SettingsActivity extends BaseActivity {
 
         // ---------------- appearance
         c.addView(Ui.section(this, "Appearance"));
-        final String[] themes = {"System default", "Light", "Dark", "Black (AMOLED)"};
-        c.addView(Ui.row(this, "Theme", themes[Prefs.theme(this)], new View.OnClickListener() {
+        final String[] themes = {"System default", "Light", "Dark", "Dark"};
+        // Windows Phone accent picker: 20 square swatches, the current one outlined
+        int cur = Prefs.accent(this);
+        String curName = "custom";
+        for (int k = 0; k < Ui.ACCENTS.length; k++) if (Ui.ACCENTS[k] == cur) curName = Ui.ACCENT_NAMES[k];
+        c.addView(Ui.row(this, "Accent colour", curName, null));
+        android.widget.GridLayout grid = new android.widget.GridLayout(this);
+        grid.setColumnCount(5);
+        grid.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), Ui.dp(this, 8));
+        int cell = (getResources().getDisplayMetrics().widthPixels - Ui.dp(this, 32)) / 5;
+        for (int k = 0; k < Ui.ACCENTS.length; k++) {
+            final int col = Ui.ACCENTS[k];
+            View sw = new View(this);
+            sw.setBackground(Ui.stroke(col, col == cur ? Ui.TEXT : col, Ui.dp(this, 3), 0));
+            sw.setContentDescription(Ui.ACCENT_NAMES[k]);
+            android.widget.GridLayout.LayoutParams gp = new android.widget.GridLayout.LayoutParams();
+            gp.width = cell - Ui.dp(this, 8);
+            gp.height = cell - Ui.dp(this, 8);
+            gp.setMargins(Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 4));
+            Ui.ripple(sw, 0, 0);
+            sw.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) { Prefs.put(SettingsActivity.this, "accent", col); recreate(); }
+            });
+            grid.addView(sw, gp);
+        }
+        c.addView(grid);
+        c.addView(Ui.row(this, "Background", themes[Prefs.theme(this)], new View.OnClickListener() {
             public void onClick(View v) {
-                Ui.single(SettingsActivity.this, "Theme", themes, Prefs.theme(SettingsActivity.this), new Ui.Cb<Integer>() {
+                Ui.single(SettingsActivity.this, "Background", new String[]{"System default", "Light", "Dark"}, Math.min(2, Prefs.theme(SettingsActivity.this)), new Ui.Cb<Integer>() {
                     public void on(Integer i) { Prefs.put(SettingsActivity.this, "theme", i); recreate(); }
                 });
             }

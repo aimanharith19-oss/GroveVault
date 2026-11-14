@@ -83,21 +83,29 @@ public class LockActivity extends Activity {
     private void build() {
         LinearLayout root = Ui.screen(this);
         LinearLayout c = Ui.vertical(this);
-        c.setGravity(Gravity.CENTER_HORIZONTAL);
-        int pad = Ui.dp(this, 28);
-        c.setPadding(pad, Ui.dp(this, 48), pad, pad);
+        int pad = Ui.dp(this, 24);
+        c.setPadding(pad, Ui.dp(this, 36), pad, pad);
         root.addView(Ui.scroll(this, c), Ui.lp(Ui.MATCH, Ui.MATCH));
 
-        TextView logo = Ui.text(this, "🌳", 56, Ui.TEXT, false);
-        logo.setGravity(Gravity.CENTER);
-        c.addView(logo);
-        TextView name = Ui.text(this, "Grove Vault", 26, Ui.TEXT, true);
-        name.setGravity(Gravity.CENTER);
-        name.setPadding(0, Ui.dp(this, 8), 0, Ui.dp(this, 4));
+        // Windows Phone lock screen: huge thin clock and date, then the page title
+        java.util.Date now = new java.util.Date();
+        TextView clock = Ui.text(this, android.text.format.DateFormat.getTimeFormat(this).format(now).replace(" AM", "").replace(" PM", ""), 84, Ui.TEXT, false);
+        clock.setTypeface(Ui.LIGHT);
+        clock.setIncludeFontPadding(false);
+        c.addView(clock);
+        TextView date = Ui.text(this, new java.text.SimpleDateFormat("EEEE, MMMM d", java.util.Locale.getDefault()).format(now).toLowerCase(), 22, Ui.TEXT, false);
+        c.addView(date);
+        TextView app = Ui.text(this, "GROVE VAULT", 14, Ui.TEXT, true);
+        app.setLetterSpacing(0.06f);
+        app.setPadding(0, Ui.dp(this, 36), 0, 0);
+        c.addView(app);
+        TextView name = Ui.text(this, Store.exists(this) ? "unlock" : "welcome", 46, Ui.TEXT, false);
+        name.setTypeface(Ui.LIGHT);
+        name.setPadding(0, 0, 0, Ui.dp(this, 10));
         c.addView(name);
 
         error = Ui.text(this, "", 14, Ui.DANGER, false);
-        error.setGravity(Gravity.CENTER);
+        error.setGravity(Gravity.START);
         error.setPadding(0, Ui.dp(this, 8), 0, 0);
 
         if (!Store.exists(this)) buildSetup(c);
@@ -119,7 +127,7 @@ public class LockActivity extends Activity {
 
     private void buildSetup(LinearLayout c) {
         TextView sub = Ui.text(this, "Create a master password. It encrypts everything in your vault.", 15, Ui.SUB, false);
-        sub.setGravity(Gravity.CENTER);
+        sub.setGravity(Gravity.START);
         c.addView(sub, Ui.margins(this, Ui.MATCH, Ui.WRAP, 0, 0, 0, 20));
         pw = Ui.edit(this, "Master password", Ui.PASSWORD_INPUT);
         c.addView(pw, Ui.margins(this, Ui.MATCH, Ui.WRAP, 0, 0, 0, 10));
@@ -151,7 +159,7 @@ public class LockActivity extends Activity {
             }
         }), Ui.margins(this, Ui.MATCH, Ui.WRAP, 0, 8, 0, 0));
         TextView tip = Ui.text(this, "You can import from SafeInCloud, KeePass, Chrome, Bitwarden and other apps once your vault is created.", 13, Ui.SUB, false);
-        tip.setGravity(Gravity.CENTER);
+        tip.setGravity(Gravity.START);
         c.addView(tip, Ui.margins(this, Ui.MATCH, Ui.WRAP, 0, 16, 0, 0));
         Ui.showKeyboard(pw);
     }
@@ -238,7 +246,7 @@ public class LockActivity extends Activity {
 
     private void buildUnlock(LinearLayout c) {
         TextView sub = Ui.text(this, "Enter your master password", 15, Ui.SUB, false);
-        sub.setGravity(Gravity.CENTER);
+        sub.setGravity(Gravity.START);
         c.addView(sub, Ui.margins(this, Ui.MATCH, Ui.WRAP, 0, 0, 0, 20));
         pw = Ui.edit(this, "Master password", Ui.PASSWORD_INPUT);
         pw.setImeOptions(EditorInfo.IME_ACTION_DONE);
@@ -521,7 +529,7 @@ public class LockActivity extends Activity {
 
     private void buildPin(LinearLayout c) {
         TextView sub = Ui.text(this, "Enter your PIN", 15, Ui.SUB, false);
-        sub.setGravity(Gravity.CENTER);
+        sub.setGravity(Gravity.START);
         c.addView(sub, Ui.margins(this, Ui.MATCH, Ui.WRAP, 0, 0, 0, 20));
         pw = Ui.edit(this, "PIN", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         pw.setGravity(Gravity.CENTER);

@@ -46,9 +46,18 @@ public final class Ui {
     public static int BG, SURFACE, SURFACE2, TEXT, SUB, ACCENT, ON_ACCENT, DIVIDER, DANGER, WARN;
     public static boolean dark;
 
+    /** Card tile colours (Windows Phone accents, same order as before so existing cards keep their colour family). */
     public static final int[] CARD_COLORS = {
-            0xFF2E7D5B, 0xFF1E88E5, 0xFF8E24AA, 0xFFE53935, 0xFFF4511E, 0xFF00897B,
-            0xFF6D4C41, 0xFF3949AB, 0xFFC0CA33, 0xFF00ACC1, 0xFFD81B60, 0xFF546E7A};
+            0xFF60A917, 0xFF1BA1E2, 0xFFAA00FF, 0xFFE51400, 0xFFFA6800, 0xFF00ABA9,
+            0xFF825A2C, 0xFF0050EF, 0xFFA4C400, 0xFF1BA1E2, 0xFFD80073, 0xFF647687};
+
+    /** The 20 Windows Phone 8 accent colours. */
+    public static final int[] ACCENTS = {
+            0xFFA4C400, 0xFF60A917, 0xFF008A00, 0xFF00ABA9, 0xFF1BA1E2, 0xFF0050EF, 0xFF6A00FF,
+            0xFFAA00FF, 0xFFF472D0, 0xFFD80073, 0xFFA20025, 0xFFE51400, 0xFFFA6800, 0xFFF0A30A,
+            0xFFE3C800, 0xFF825A2C, 0xFF6D8764, 0xFF647687, 0xFF76608A, 0xFF87794E};
+    public static final String[] ACCENT_NAMES = {"lime", "green", "emerald", "teal", "cyan", "cobalt", "indigo",
+            "violet", "pink", "magenta", "crimson", "red", "orange", "amber", "yellow", "brown", "olive", "steel", "mauve", "taupe"};
 
     public static final String[] ICON_NAMES = {"web", "email", "key", "card", "bank", "id", "car", "shield", "star", "wifi", "code", "server", "lock", "note", "phone", "game", "cart", "home", "heart", "plane"};
     public static final String[] ICON_GLYPHS = {"🌐", "✉️", "🔑", "💳", "🏦", "🆔", "🚗", "🛡️", "⭐", "📶", "💾", "🖥️", "🔒", "📝", "📱", "🎮", "🛒", "🏠", "❤️", "✈️"};
@@ -72,37 +81,34 @@ public final class Ui {
         int t = Prefs.theme(a);
         boolean night = (a.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         dark = t == 2 || t == 3 || (t == 0 && night);
-        boolean black = t == 3;
+        ACCENT = Prefs.accent(a);
+        ON_ACCENT = 0xFFFFFFFF;
         if (dark) {
-            BG = black ? 0xFF000000 : 0xFF0F1412;
-            SURFACE = black ? 0xFF0E0F0E : 0xFF19201C;
-            SURFACE2 = black ? 0xFF1A1C1A : 0xFF232B26;
-            TEXT = 0xFFE6ECE8;
-            SUB = 0xFF98A69E;
-            ACCENT = 0xFF6FCF97;
-            ON_ACCENT = 0xFF06210F;
-            DIVIDER = black ? 0xFF1F221F : 0xFF2A332E;
-            DANGER = 0xFFFF8A80;
-            WARN = 0xFFFFCC66;
-            a.setTheme(translucent ? R.style.AppTranslucentDark : black ? R.style.AppBlack : R.style.AppDark);
+            BG = 0xFF000000;
+            SURFACE = 0xFF1F1F1F;
+            SURFACE2 = 0xFF2E2E2E;
+            TEXT = 0xFFFFFFFF;
+            SUB = 0xFF8A8A8A;
+            DIVIDER = 0x00000000;
+            DANGER = 0xFFFF5A4E;
+            WARN = 0xFFF0A30A;
+            a.setTheme(translucent ? R.style.AppTranslucentDark : R.style.AppDark);
         } else {
-            BG = 0xFFF4F6F3;
-            SURFACE = 0xFFFFFFFF;
-            SURFACE2 = 0xFFE9EEE9;
-            TEXT = 0xFF17201B;
-            SUB = 0xFF5B6A61;
-            ACCENT = 0xFF2E7D5B;
-            ON_ACCENT = 0xFFFFFFFF;
-            DIVIDER = 0xFFE0E6E1;
-            DANGER = 0xFFC62828;
-            WARN = 0xFFB26A00;
+            BG = 0xFFFFFFFF;
+            SURFACE = 0xFFF0F0F0;
+            SURFACE2 = 0xFFE2E2E2;
+            TEXT = 0xFF000000;
+            SUB = 0xFF6B6B6B;
+            DIVIDER = 0x00000000;
+            DANGER = 0xFFE51400;
+            WARN = 0xFFC27D00;
             a.setTheme(translucent ? R.style.AppTranslucent : R.style.AppLight);
         }
         if (translucent) {
             if (!Prefs.allowScreenshots(a)) a.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
             return;
         }
-        a.getWindow().setStatusBarColor(BG);
+        a.getWindow().setStatusBarColor(blend(BG, ACCENT, dark ? 0.36f : 0.22f));
         a.getWindow().setNavigationBarColor(BG);
         int flags = a.getWindow().getDecorView().getSystemUiVisibility();
         if (!dark) flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | 0x10; // light nav bar (API 26)
@@ -112,6 +118,38 @@ public final class Ui {
         else a.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
         if (android.os.Build.VERSION.SDK_INT >= 33) a.setRecentsScreenshotEnabled(Prefs.allowScreenshots(a));
         if (android.os.Build.VERSION.SDK_INT >= 31) a.getWindow().setHideOverlayWindows(true); // hide other apps' overlays over the vault
+    }
+
+    public static int blend(int a, int b, float t) {
+        int ar = a >> 16 & 0xff, ag = a >> 8 & 0xff, ab = a & 0xff, br = b >> 16 & 0xff, bg = b >> 8 & 0xff, bb = b & 0xff;
+        return 0xFF000000 | Math.round(ar + (br - ar) * t) << 16 | Math.round(ag + (bg - ag) * t) << 8 | Math.round(ab + (bb - ab) * t);
+    }
+
+    public static final Typeface LIGHT = Typeface.create("sans-serif-light", Typeface.NORMAL);
+    public static final Typeface SEMI = Typeface.create("sans-serif-medium", Typeface.NORMAL);
+
+    /** Windows Phone "tilt": the item tips toward the finger and shrinks slightly while pressed. */
+    public static void tilt(final View v) {
+        v.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View view, android.view.MotionEvent e) {
+                switch (e.getActionMasked()) {
+                    case android.view.MotionEvent.ACTION_DOWN: {
+                        float w = Math.max(1, view.getWidth()), h = Math.max(1, view.getHeight());
+                        float nx = (e.getX() / w - 0.5f) * 2f, ny = (e.getY() / h - 0.5f) * 2f;
+                        float max = w > dp(view.getContext(), 240) ? 3f : 9f;
+                        view.setCameraDistance(14000 * view.getResources().getDisplayMetrics().density);
+                        view.animate().rotationY(-nx * max).rotationX(ny * max).scaleX(0.965f).scaleY(0.965f).setDuration(90).start();
+                        break;
+                    }
+                    case android.view.MotionEvent.ACTION_UP:
+                    case android.view.MotionEvent.ACTION_CANCEL:
+                        view.animate().rotationY(0).rotationX(0).scaleX(1).scaleY(1).setDuration(240)
+                                .setInterpolator(new android.view.animation.DecelerateInterpolator(2f)).start();
+                        break;
+                }
+                return false;
+            }
+        });
     }
 
     // ---------------------------------------------------------------- basics
@@ -128,10 +166,10 @@ public final class Ui {
         });
     }
 
+    /** Metro shapes are square; the radius argument is kept for compatibility and ignored. */
     public static GradientDrawable round(int color, float radiusPx) {
         GradientDrawable g = new GradientDrawable();
         g.setColor(color);
-        g.setCornerRadius(radiusPx);
         return g;
     }
 
@@ -142,9 +180,9 @@ public final class Ui {
     }
 
     public static void ripple(View v, int bg, float radius) {
-        int rc = dark ? 0x33FFFFFF : 0x22000000;
-        v.setBackground(new RippleDrawable(ColorStateList.valueOf(rc), bg == 0 ? null : round(bg, radius), round(0xFFFFFFFF, radius)));
+        if (bg != 0) v.setBackground(round(bg, 0));
         v.setClickable(true);
+        tilt(v);
     }
 
     public static LinearLayout vertical(Context c) {
@@ -165,7 +203,8 @@ public final class Ui {
         t.setText(s);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
         t.setTextColor(color);
-        if (bold) t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        if (bold) t.setTypeface(SEMI);
+        else if (sp >= 19) t.setTypeface(LIGHT); // Windows Phone's big thin type
         return t;
     }
 
@@ -186,37 +225,61 @@ public final class Ui {
     public static final int MATCH = ViewGroup.LayoutParams.MATCH_PARENT;
     public static final int WRAP = ViewGroup.LayoutParams.WRAP_CONTENT;
 
-    /** Filled accent button. */
+    /** Windows Phone button: square outline, lowercase label, fills with the accent while pressed. */
     public static TextView button(Context c, String label, View.OnClickListener l) {
-        TextView b = text(c, label, 15, ON_ACCENT, true);
+        TextView b = text(c, label.toLowerCase(), 18, TEXT, false);
+        b.setTypeface(Typeface.DEFAULT);
         b.setGravity(Gravity.CENTER);
         b.setPadding(dp(c, 20), dp(c, 12), dp(c, 20), dp(c, 12));
-        b.setBackground(new RippleDrawable(ColorStateList.valueOf(0x33FFFFFF), round(ACCENT, dp(c, 24)), null));
+        android.graphics.drawable.StateListDrawable st = new android.graphics.drawable.StateListDrawable();
+        st.addState(new int[]{android.R.attr.state_pressed}, stroke(ACCENT, ACCENT, dp(c, 2), 0));
+        st.addState(new int[]{}, stroke(0x00000000, TEXT, dp(c, 2), 0));
+        b.setBackground(st);
         b.setOnClickListener(l);
+        tilt(b);
         return b;
     }
 
-    /** Low-emphasis button. */
+    /** Text action in the accent colour (like "shuffle all" in Grove Music). */
     public static TextView flatButton(Context c, String label, View.OnClickListener l) {
-        TextView b = text(c, label, 15, ACCENT, true);
-        b.setGravity(Gravity.CENTER);
-        b.setPadding(dp(c, 16), dp(c, 12), dp(c, 16), dp(c, 12));
-        ripple(b, 0, dp(c, 24));
+        TextView b = text(c, label.toLowerCase(), 19, ACCENT, false);
+        b.setGravity(Gravity.CENTER_VERTICAL);
+        b.setPadding(dp(c, 4), dp(c, 10), dp(c, 12), dp(c, 10));
+        b.setClickable(true);
+        tilt(b);
         b.setOnClickListener(l);
         return b;
     }
 
-    /** Round icon with an emoji glyph on a coloured circle. */
+    /** Square tile with the icon glyph on the card's colour. */
     public static TextView badge(Context c, String icon, int colorIndex, int sizeDp) {
         TextView t = new TextView(c);
         t.setText(glyph(icon));
         t.setGravity(Gravity.CENTER);
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeDp * 0.42f);
-        GradientDrawable g = new GradientDrawable();
-        g.setShape(GradientDrawable.OVAL);
-        int col = cardColor(colorIndex);
-        g.setColor((col & 0x00FFFFFF) | (dark ? 0x55000000 : 0x2E000000));
-        t.setBackground(g);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeDp * 0.40f);
+        t.setBackground(round(cardColor(colorIndex), 0));
+        t.setLayoutParams(lp(dp(c, sizeDp), dp(c, sizeDp)));
+        return t;
+    }
+
+    /** True when cardIcon() shows only the letter tile (no website/app icon available yet). */
+    public static boolean letterOnly(View icon) {
+        if (!(icon instanceof ViewGroup)) return false;
+        ViewGroup g = (ViewGroup) icon;
+        for (int i = 0; i < g.getChildCount(); i++)
+            if (g.getChildAt(i) instanceof android.widget.ImageView && g.getChildAt(i).getVisibility() == View.VISIBLE) return false;
+        return true;
+    }
+
+    /** Windows Phone letter tile: a coloured square with a thin lowercase letter in the bottom-left corner. */
+    public static TextView letterTile(Context c, String title, int color, int sizeDp) {
+        String l = title == null || title.trim().length() == 0 ? "#" : title.trim().substring(0, 1).toLowerCase();
+        TextView t = text(c, l, sizeDp * 0.52f, 0xFFFFFFFF, false);
+        t.setTypeface(LIGHT);
+        t.setGravity(Gravity.BOTTOM | Gravity.START);
+        t.setPadding(dp(c, sizeDp * 0.12f), 0, 0, dp(c, sizeDp * 0.02f));
+        t.setIncludeFontPadding(false);
+        t.setBackground(round(color, 0));
         t.setLayoutParams(lp(dp(c, sizeDp), dp(c, sizeDp)));
         return t;
     }
@@ -227,18 +290,13 @@ public final class Ui {
     public static FrameLayout cardIcon(Context c, org.grove.vault.core.Card card, int sizeDp) {
         final FrameLayout f = new FrameLayout(c);
         f.setLayoutParams(lp(dp(c, sizeDp), dp(c, sizeDp)));
-        TextView badge = badge(c, card.icon, card.color, sizeDp);
+        TextView badge = letterTile(c, card.title, cardColor(card.color), sizeDp);
         f.addView(badge, new FrameLayout.LayoutParams(MATCH, MATCH));
         final String key = IconCache.keyFor(card);
         if (key == null) return f;
         final android.widget.ImageView iv = new android.widget.ImageView(c);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setShape(GradientDrawable.OVAL);
-        bg.setColor(0xFFFFFFFF);
-        bg.setStroke(Math.max(1, dp(c, 0.7f)), dark ? 0x33FFFFFF : 0x22000000);
-        iv.setBackground(bg);
-        iv.setClipToOutline(true);
-        int pad = Math.round(dp(c, sizeDp) * 0.16f);
+        iv.setBackground(round(0xFFFFFFFF, 0));
+        int pad = Math.round(dp(c, sizeDp) * 0.14f);
         iv.setPadding(pad, pad, pad, pad);
         iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         iv.setVisibility(View.GONE);
@@ -258,36 +316,84 @@ public final class Ui {
 
     /** Icon-only button with a text glyph (keeps the APK free of image assets). */
     public static TextView iconButton(Context c, String glyph, View.OnClickListener l) {
-        TextView t = text(c, glyph, 20, TEXT, false);
+        TextView t = text(c, glyph, 19, TEXT, false);
+        t.setTypeface(Typeface.DEFAULT);
         t.setGravity(Gravity.CENTER);
         t.setLayoutParams(lp(dp(c, 44), dp(c, 44)));
-        ripple(t, 0, dp(c, 22));
+        t.setClickable(true);
+        tilt(t);
         t.setOnClickListener(l);
         return t;
     }
 
-    /** Top bar with optional back arrow, title and right-side views. */
+    /**
+     * Windows Phone page header: small caps app name and a huge, thin, lowercase page title. Actions go to the
+     * round-button application bar at the bottom of the screen (back is the phone's back gesture/button).
+     * back=false marks the hub page, which gets the bigger "panorama" title.
+     */
     public static LinearLayout topBar(final Activity a, String title, boolean back, View... actions) {
-        LinearLayout bar = horizontal(a);
-        bar.setPadding(dp(a, 4), dp(a, 6), dp(a, 4), dp(a, 6));
-        bar.setMinimumHeight(dp(a, 56));
+        LinearLayout h = vertical(a);
+        h.setPadding(dp(a, 20), dp(a, 10), dp(a, 20), dp(a, 4));
         if (back) {
-            bar.addView(iconButton(a, "←", new View.OnClickListener() {
-                public void onClick(View v) {
-                    a.onBackPressed();
-                }
-            }));
-        } else {
-            View sp = new View(a);
-            bar.addView(sp, lp(dp(a, 12), 1));
+            TextView app = text(a, "GROVE VAULT", 14, TEXT, true);
+            app.setLetterSpacing(0.06f);
+            h.addView(app);
         }
-        TextView t = text(a, title, 20, TEXT, true);
-        t.setSingleLine(true);
-        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        t.setPadding(dp(a, 6), 0, 0, 0);
-        bar.addView(t, lpw(1));
-        for (View v : actions) bar.addView(v);
-        return bar;
+        if (title != null && title.length() > 0) {
+            TextView t = text(a, title.toLowerCase(), back ? 46 : 60, TEXT, false);
+            t.setTypeface(LIGHT);
+            t.setSingleLine(true);
+            if (back) t.setEllipsize(android.text.TextUtils.TruncateAt.END); // hub title runs off the edge, like a panorama
+            t.setLetterSpacing(-0.03f);
+            t.setIncludeFontPadding(false);
+            t.setPadding(0, dp(a, back ? 0 : 6), 0, dp(a, 6));
+            h.addView(t);
+        }
+        appBar(a, actions);
+        return h;
+    }
+
+    /** Fills the bottom application bar: round outlined buttons for glyphs, lowercase words for text actions. */
+    public static void appBar(Activity a, View... actions) {
+        View root = a.getWindow().getDecorView().findViewWithTag("grove_appbar");
+        if (!(root instanceof LinearLayout)) return;
+        LinearLayout bar = (LinearLayout) root;
+        bar.removeAllViews();
+        if (actions == null || actions.length == 0) {
+            bar.setVisibility(View.GONE);
+            return;
+        }
+        View sp = new View(a);
+        bar.addView(sp, lpw(1));
+        for (View v : actions) {
+            if (v.getParent() instanceof ViewGroup) ((ViewGroup) v.getParent()).removeView(v);
+            if (v instanceof TextView) {
+                TextView t = (TextView) v;
+                String s = t.getText().toString();
+                if (s.length() <= 2) {
+                    GradientDrawable ring = new GradientDrawable();
+                    ring.setShape(GradientDrawable.OVAL);
+                    ring.setStroke(dp(a, 2), TEXT);
+                    t.setBackground(ring);
+                    t.setTextColor(TEXT);
+                    t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+                    LinearLayout.LayoutParams p = lp(dp(a, 46), dp(a, 46));
+                    p.setMargins(dp(a, 10), 0, dp(a, 10), 0);
+                    bar.addView(t, p);
+                } else {
+                    t.setText(s.toLowerCase());
+                    t.setTextColor(TEXT);
+                    t.setBackground(null);
+                    t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+                    LinearLayout.LayoutParams p = lp(WRAP, WRAP);
+                    p.setMargins(dp(a, 10), 0, dp(a, 10), 0);
+                    bar.addView(t, p);
+                }
+            } else bar.addView(v);
+        }
+        View end = new View(a);
+        bar.addView(end, lp(dp(a, 8), 1));
+        bar.setVisibility(View.VISIBLE);
     }
 
     public static View divider(Context c) {
@@ -298,20 +404,20 @@ public final class Ui {
     }
 
     public static TextView section(Context c, String s) {
-        TextView t = text(c, s.toUpperCase(), 12, ACCENT, true);
-        t.setLetterSpacing(0.08f);
-        t.setPadding(dp(c, 20), dp(c, 20), dp(c, 20), dp(c, 6));
+        TextView t = text(c, s.toLowerCase(), 20, ACCENT, false);
+        t.setPadding(dp(c, 20), dp(c, 22), dp(c, 20), dp(c, 4));
         return t;
     }
 
     /** A tappable two-line row. */
     public static LinearLayout row(Context c, String title, String subtitle, View.OnClickListener l) {
         LinearLayout r = horizontal(c);
-        r.setPadding(dp(c, 20), dp(c, 14), dp(c, 20), dp(c, 14));
+        r.setPadding(dp(c, 20), dp(c, 10), dp(c, 20), dp(c, 10));
         LinearLayout tx = vertical(c);
-        tx.addView(text(c, title, 16, TEXT, false));
+        TextView tt = text(c, title.toLowerCase(), 21, TEXT, false);
+        tx.addView(tt);
         if (subtitle != null && subtitle.length() > 0) {
-            TextView s = text(c, subtitle, 13, SUB, false);
+            TextView s = text(c, subtitle, 14, SUB, false);
             s.setPadding(0, dp(c, 2), 0, 0);
             tx.addView(s);
         }
@@ -332,6 +438,9 @@ public final class Ui {
         LinearLayout r = row(c, title, subtitle, null);
         final Switch s = new Switch(c);
         s.setChecked(checked);
+        int[][] states = {{android.R.attr.state_checked}, {}};
+        s.setThumbTintList(new ColorStateList(states, new int[]{0xFFFFFFFF, dark ? 0xFFBBBBBB : 0xFF777777}));
+        s.setTrackTintList(new ColorStateList(states, new int[]{ACCENT, dark ? 0xFF555555 : 0xFFBBBBBB}));
         r.addView(s);
         ripple(r, 0, 0);
         r.setOnClickListener(new View.OnClickListener() {
@@ -354,9 +463,20 @@ public final class Ui {
         e.setInputType(inputType);
         e.setTextColor(TEXT);
         e.setHintTextColor(SUB);
-        e.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-        e.setPadding(dp(c, 14), dp(c, 12), dp(c, 14), dp(c, 12));
-        e.setBackground(stroke(SURFACE, DIVIDER, dp(c, 1), dp(c, 12)));
+        e.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+        e.setPadding(dp(c, 12), dp(c, 11), dp(c, 12), dp(c, 11));
+        // Windows Phone text box: square, light fill, accent border while typing
+        android.graphics.drawable.StateListDrawable st = new android.graphics.drawable.StateListDrawable();
+        st.addState(new int[]{android.R.attr.state_focused}, stroke(dark ? 0xFFFFFFFF : 0xFFFFFFFF, ACCENT, dp(c, 2), 0));
+        st.addState(new int[]{}, stroke(dark ? 0x33FFFFFF : 0xFFF0F0F0, dark ? 0x99FFFFFF : 0xFF999999, dp(c, 2), 0));
+        e.setBackground(st);
+        e.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            public void onFocusChange(View v, boolean has) {
+                // focused box is white like Windows Phone, so text turns black
+                ((EditText) v).setTextColor(has ? 0xFF000000 : TEXT);
+                ((EditText) v).setHintTextColor(has ? 0xFF888888 : SUB);
+            }
+        });
         // Ask the keyboard not to learn or store what's typed here.
         e.setImeOptions(e.getImeOptions() | android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
         e.setFilterTouchesWhenObscured(true);
@@ -380,25 +500,38 @@ public final class Ui {
         return s;
     }
 
+    /** Pivot header: big thin lowercase word; the current one is bright, the others faded. */
     public static TextView chip(Context c, String label, boolean selected, View.OnClickListener l) {
-        TextView t = text(c, label, 14, selected ? ON_ACCENT : TEXT, selected);
-        t.setPadding(dp(c, 14), dp(c, 7), dp(c, 14), dp(c, 7));
-        t.setBackground(selected ? round(ACCENT, dp(c, 18)) : stroke(SURFACE, DIVIDER, dp(c, 1), dp(c, 18)));
+        TextView t = text(c, label.toLowerCase(), 30, TEXT, false);
+        t.setTypeface(LIGHT);
+        t.setAlpha(selected ? 1f : 0.4f);
+        t.setPadding(dp(c, 2), 0, dp(c, 18), dp(c, 2));
+        t.setSingleLine(true);
         t.setOnClickListener(l);
+        t.setClickable(true);
         LinearLayout.LayoutParams p = lp(WRAP, WRAP);
-        p.setMargins(dp(c, 4), 0, dp(c, 4), 0);
         t.setLayoutParams(p);
         return t;
     }
 
-    /** Root container with background colour; returns the vertical content layout. */
+    /** Root: black (or white) with an accent glow at the top, page content, and the bottom application bar. */
     public static LinearLayout screen(Activity a) {
-        LinearLayout root = vertical(a);
-        root.setBackgroundColor(BG);
-        root.setFitsSystemWindows(true);
-        root.setFilterTouchesWhenObscured(true); // ignore taps while another app draws over us (tapjacking)
-        a.setContentView(root);
-        return root;
+        LinearLayout outer = vertical(a);
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{
+                blend(BG, ACCENT, dark ? 0.36f : 0.22f), blend(BG, ACCENT, dark ? 0.10f : 0.06f), BG, BG});
+        outer.setBackground(g);
+        outer.setFitsSystemWindows(true);
+        outer.setFilterTouchesWhenObscured(true); // ignore taps while another app draws over us (tapjacking)
+        LinearLayout content = vertical(a);
+        outer.addView(content, new LinearLayout.LayoutParams(MATCH, 0, 1));
+        LinearLayout bar = horizontal(a);
+        bar.setTag("grove_appbar");
+        bar.setMinimumHeight(dp(a, 62));
+        bar.setBackgroundColor(dark ? blend(0xFF000000, ACCENT, 0.12f) : blend(0xFFFFFFFF, ACCENT, 0.08f));
+        bar.setVisibility(View.GONE);
+        outer.addView(bar, lp(MATCH, WRAP));
+        a.setContentView(outer);
+        return content;
     }
 
     public static void hideKeyboard(View v) {
@@ -418,10 +551,47 @@ public final class Ui {
 
     // ---------------------------------------------------------------- dialogs
 
+    /** Windows Phone message box: a square panel across the top of the screen, lowercase actions in the accent. */
     public static AlertDialog.Builder dialog(Context c, String title) {
-        AlertDialog.Builder b = new AlertDialog.Builder(c);
-        if (title != null) b.setTitle(title);
+        AlertDialog.Builder b = new AlertDialog.Builder(c, dark ? R.style.MetroDialogDark : R.style.MetroDialogLight) {
+            @Override
+            public AlertDialog create() {
+                final AlertDialog d = super.create();
+                d.setOnShowListener(new DialogInterface.OnShowListener() {
+                    public void onShow(DialogInterface di) { metro(d); }
+                });
+                return d;
+            }
+        };
+        if (title != null) {
+            TextView t = text(c, title.toLowerCase(), 26, TEXT, false);
+            t.setTypeface(LIGHT);
+            t.setPadding(dp(c, 24), dp(c, 22), dp(c, 24), dp(c, 6));
+            b.setCustomTitle(t);
+        }
         return b;
+    }
+
+    static void metro(AlertDialog d) {
+        if (d.getWindow() != null) {
+            d.getWindow().setGravity(Gravity.TOP);
+            d.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        for (int w : new int[]{DialogInterface.BUTTON_POSITIVE, DialogInterface.BUTTON_NEGATIVE, DialogInterface.BUTTON_NEUTRAL}) {
+            android.widget.Button btn = d.getButton(w);
+            if (btn == null) continue;
+            btn.setAllCaps(false);
+            btn.setText(btn.getText().toString().toLowerCase());
+            btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+            btn.setTextColor(TEXT);
+            android.graphics.drawable.StateListDrawable st = new android.graphics.drawable.StateListDrawable();
+            st.addState(new int[]{android.R.attr.state_pressed}, stroke(ACCENT, ACCENT, d.getContext().getResources().getDisplayMetrics().density > 0 ? dp(d.getContext(), 2) : 2, 0));
+            st.addState(new int[]{}, stroke(0, TEXT, dp(d.getContext(), 2), 0));
+            btn.setBackground(st);
+            ViewGroup.LayoutParams p = btn.getLayoutParams();
+            if (p instanceof ViewGroup.MarginLayoutParams) ((ViewGroup.MarginLayoutParams) p).setMargins(dp(d.getContext(), 6), dp(d.getContext(), 4), dp(d.getContext(), 6), dp(d.getContext(), 10));
+            btn.setMinWidth(dp(d.getContext(), 96));
+        }
     }
 
     public static void message(Context c, String title, String msg) {

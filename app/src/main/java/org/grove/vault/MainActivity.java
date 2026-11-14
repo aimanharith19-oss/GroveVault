@@ -67,7 +67,10 @@ public class MainActivity extends BaseActivity {
     private void build() {
         LinearLayout root = Ui.screen(this);
         final TextView searchBtn = Ui.iconButton(this, "🔍", null);
-        TextView menuBtn = Ui.iconButton(this, "⋮", null);
+        TextView menuBtn = Ui.iconButton(this, "…", null);
+        TextView addBtn = Ui.iconButton(this, "+", new View.OnClickListener() {
+            public void onClick(View v) { addCard(); }
+        });
         final TextView viewBtn = Ui.iconButton(this, Prefs.p(this).getBoolean("grid", false) ? "☰" : "▦", null);
         viewBtn.setContentDescription("Switch between list and grid");
         viewBtn.setOnClickListener(new View.OnClickListener() {
@@ -78,7 +81,7 @@ public class MainActivity extends BaseActivity {
                 showCards();
             }
         });
-        LinearLayout bar = Ui.topBar(this, "Grove Vault", false, searchBtn, viewBtn, menuBtn);
+        LinearLayout bar = Ui.topBar(this, "grove vault", false, addBtn, searchBtn, viewBtn, menuBtn);
         root.addView(bar);
         search = Ui.edit(this, "Search cards", InputType.TYPE_CLASS_TEXT);
         search.setVisibility(View.GONE);
@@ -108,7 +111,7 @@ public class MainActivity extends BaseActivity {
             }
         });
         chips = Ui.horizontal(this);
-        chips.setPadding(Ui.dp(this, 12), 0, Ui.dp(this, 12), Ui.dp(this, 8));
+        chips.setPadding(Ui.dp(this, 18), 0, Ui.dp(this, 12), Ui.dp(this, 10));
         root.addView(Ui.hscroll(this, chips));
 
         frame = new FrameLayout(this);
@@ -121,19 +124,6 @@ public class MainActivity extends BaseActivity {
         empty.setPadding(Ui.dp(this, 40), 0, Ui.dp(this, 40), 0);
         frame.addView(empty, new FrameLayout.LayoutParams(Ui.MATCH, Ui.MATCH));
 
-        TextView fab = Ui.text(this, "+", 30, Ui.ON_ACCENT, false);
-        fab.setGravity(Gravity.CENTER);
-        fab.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33FFFFFF),
-                Ui.round(Ui.ACCENT, Ui.dp(this, 18)), null));
-        fab.setElevation(Ui.dp(this, 6));
-        FrameLayout.LayoutParams fp = new FrameLayout.LayoutParams(Ui.dp(this, 60), Ui.dp(this, 60), Gravity.BOTTOM | Gravity.END);
-        fp.setMargins(0, 0, Ui.dp(this, 20), Ui.dp(this, 20));
-        frame.addView(fab, fp);
-        fab.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                addCard();
-            }
-        });
     }
 
     private FrameLayout frame;
@@ -149,9 +139,9 @@ public class MainActivity extends BaseActivity {
             g.setNumColumns(android.widget.GridView.AUTO_FIT);
             g.setColumnWidth(Ui.dp(this, 104));
             g.setStretchMode(android.widget.GridView.STRETCH_COLUMN_WIDTH);
-            g.setVerticalSpacing(Ui.dp(this, 6));
-            g.setHorizontalSpacing(Ui.dp(this, 6));
-            g.setPadding(Ui.dp(this, 10), Ui.dp(this, 4), Ui.dp(this, 10), Ui.dp(this, 88));
+            g.setVerticalSpacing(Ui.dp(this, 8));
+            g.setHorizontalSpacing(Ui.dp(this, 8));
+            g.setPadding(Ui.dp(this, 16), Ui.dp(this, 4), Ui.dp(this, 16), Ui.dp(this, 16));
             v = g;
         } else {
             ListView l = new ListView(this);
@@ -394,42 +384,32 @@ public class MainActivity extends BaseActivity {
         } else super.onBackPressed();
     }
 
-    /** Grid tile: big icon, title, login; star and warning badges in the corners. */
+    /** Live tile: square in the card's colour, icon in the middle, name in the bottom-left corner. */
     private View tile(Card c) {
-        FrameLayout f = new FrameLayout(this);
-        LinearLayout t = Ui.vertical(this);
-        t.setGravity(Gravity.CENTER_HORIZONTAL);
-        t.setPadding(Ui.dp(this, 8), Ui.dp(this, 14), Ui.dp(this, 8), Ui.dp(this, 12));
-        t.setBackground(Ui.round(Ui.SURFACE, Ui.dp(this, 16)));
-        t.addView(Ui.cardIcon(this, c, 52));
-        TextView title = Ui.text(this, c.title.length() == 0 ? "(untitled)" : c.title, 14, Ui.TEXT, true);
-        title.setGravity(Gravity.CENTER);
-        title.setLines(2); // same height for every tile
+        FrameLayout f = new FrameLayout(this) {
+            @Override
+            protected void onMeasure(int w, int h) { super.onMeasure(w, w); }
+        };
+        f.setBackgroundColor(Ui.cardColor(c.color));
+        View icon = Ui.cardIcon(this, c, 54); // letter (same colour as the tile) until the site icon arrives
+        f.addView(icon, new FrameLayout.LayoutParams(Ui.WRAP, Ui.WRAP, Gravity.CENTER));
+        TextView title = Ui.text(this, c.title.length() == 0 ? "(untitled)" : c.title, 13, 0xFFFFFFFF, false);
+        title.setSingleLine(true);
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        title.setPadding(0, Ui.dp(this, 8), 0, 0);
-        t.addView(title, Ui.lp(Ui.MATCH, Ui.WRAP));
-        String sub = c.template ? c.fields.size() + " fields" : c.subtitle();
-        TextView s = Ui.text(this, sub.length() == 0 ? " " : sub, 11, Ui.SUB, false);
-        s.setGravity(Gravity.CENTER);
-        s.setSingleLine(true);
-        s.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        t.addView(s, Ui.lp(Ui.MATCH, Ui.WRAP));
-        f.addView(t, new FrameLayout.LayoutParams(Ui.MATCH, Ui.WRAP));
+        FrameLayout.LayoutParams tl = new FrameLayout.LayoutParams(Ui.MATCH, Ui.WRAP, Gravity.BOTTOM | Gravity.START);
+        tl.setMargins(Ui.dp(this, 8), 0, Ui.dp(this, 8), Ui.dp(this, 6));
+        f.addView(title, tl);
         String badges = "";
         if (!c.template && Prefs.showWarnings(this) && (Audit.isExpired(c, System.currentTimeMillis()) || Audit.hasWeakPassword(c) || Audit.isReused(c, reused))) badges += "⚠";
         for (Field pf : c.fields) if (Field.PASSKEY.equals(pf.type)) { badges += "🔐"; break; }
+        if (c.favorite) badges += "★";
         if (badges.length() > 0) {
-            TextView b = Ui.text(this, badges, 12, Ui.WARN, false);
-            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(Ui.WRAP, Ui.WRAP, Gravity.TOP | Gravity.START);
-            lp.setMargins(Ui.dp(this, 8), Ui.dp(this, 6), 0, 0);
+            TextView b = Ui.text(this, badges, 12, 0xFFFFFFFF, false);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(Ui.WRAP, Ui.WRAP, Gravity.TOP | Gravity.END);
+            lp.setMargins(0, Ui.dp(this, 5), Ui.dp(this, 7), 0);
             f.addView(b, lp);
         }
-        if (c.favorite) {
-            TextView st = Ui.text(this, "★", 15, Ui.WARN, false);
-            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(Ui.WRAP, Ui.WRAP, Gravity.TOP | Gravity.END);
-            lp.setMargins(0, Ui.dp(this, 4), Ui.dp(this, 8), 0);
-            f.addView(st, lp);
-        }
+        Ui.tilt(f);
         return f;
     }
 
@@ -442,17 +422,18 @@ public class MainActivity extends BaseActivity {
             Card c = shown.get(pos);
             if (Prefs.p(MainActivity.this).getBoolean("grid", false)) return tile(c);
             LinearLayout r = Ui.horizontal(MainActivity.this);
-            r.setPadding(Ui.dp(MainActivity.this, 16), Ui.dp(MainActivity.this, 10), Ui.dp(MainActivity.this, 16), Ui.dp(MainActivity.this, 10));
-            r.addView(Ui.cardIcon(MainActivity.this, c, 42));
+            r.setPadding(Ui.dp(MainActivity.this, 20), Ui.dp(MainActivity.this, 7), Ui.dp(MainActivity.this, 16), Ui.dp(MainActivity.this, 7));
+            r.setGravity(Gravity.CENTER_VERTICAL);
+            r.addView(Ui.cardIcon(MainActivity.this, c, 54));
             LinearLayout tx = Ui.vertical(MainActivity.this);
             tx.setPadding(Ui.dp(MainActivity.this, 14), 0, Ui.dp(MainActivity.this, 8), 0);
-            TextView t = Ui.text(MainActivity.this, c.title.length() == 0 ? "(untitled)" : c.title, 16, Ui.TEXT, false);
+            TextView t = Ui.text(MainActivity.this, c.title.length() == 0 ? "(untitled)" : c.title, 21, Ui.TEXT, false);
             t.setSingleLine(true);
             t.setEllipsize(android.text.TextUtils.TruncateAt.END);
             tx.addView(t);
             String sub = c.template ? c.fields.size() + " fields" : c.subtitle();
             if (sub.length() > 0) {
-                TextView s = Ui.text(MainActivity.this, sub, 13, Ui.SUB, false);
+                TextView s = Ui.text(MainActivity.this, sub, 14, Ui.SUB, false);
                 s.setSingleLine(true);
                 s.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 tx.addView(s);
