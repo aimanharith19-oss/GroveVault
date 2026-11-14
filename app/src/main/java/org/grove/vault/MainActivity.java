@@ -41,7 +41,8 @@ public class MainActivity extends BaseActivity {
     private final List<Card> shown = new ArrayList<Card>();
     private Map<String, List<Card>> reused;
     private Adapter adapter;
-    private LinearLayout chips;
+    private Ui.PivotHeader chips;
+    private final Ui.Swiper swiper = new Ui.Swiper();
     private TextView empty;
     private EditText search;
 
@@ -111,9 +112,8 @@ public class MainActivity extends BaseActivity {
                 showMenu(v);
             }
         });
-        chips = Ui.horizontal(this);
-        chips.setPadding(Ui.dp(this, 18), 0, Ui.dp(this, 12), Ui.dp(this, 6));
-        root.addView(Ui.hscroll(this, chips));
+        chips = new Ui.PivotHeader(this);
+        root.addView(chips, Ui.lp(Ui.MATCH, Ui.WRAP));
 
         frame = new FrameLayout(this);
         root.addView(frame, Ui.lp(Ui.MATCH, 0));
@@ -130,17 +130,6 @@ public class MainActivity extends BaseActivity {
     }
 
     private View header;
-
-    /** Hides the big title while scrolled down so more cards fit on screen. */
-    private final android.widget.AbsListView.OnScrollListener collapse = new android.widget.AbsListView.OnScrollListener() {
-        public void onScrollStateChanged(android.widget.AbsListView v, int s) {}
-        public void onScroll(android.widget.AbsListView v, int first, int visible, int total) {
-            if (header == null) return;
-            if (first > 1 && header.getVisibility() == View.VISIBLE) header.setVisibility(View.GONE);
-            else if (first == 0 && header.getVisibility() != View.VISIBLE && (v.getChildCount() == 0 || v.getChildAt(0).getTop() >= v.getPaddingTop()))
-                header.setVisibility(View.VISIBLE);
-        }
-    };
 
     private FrameLayout frame;
     private android.widget.AbsListView cardsView;
@@ -166,7 +155,6 @@ public class MainActivity extends BaseActivity {
             v = l;
         }
         v.setClipToPadding(false);
-        v.setOnScrollListener(collapse);
         v.setOnTouchListener(swipeListener());
         v.setAdapter(adapter);
         v.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -198,18 +186,29 @@ public class MainActivity extends BaseActivity {
             if (Audit.isExpiring(c, days, now)) exp++;
             if (c.favorite) fav++;
         }
-        chips.removeAllViews();
         pivotKeys.clear();
-        addChip("All " + active.size(), "all");
-        if (fav > 0) addChip("★ Favourites", "fav");
+        pivotNames.clear();
+        addChip("all", "all");
+        if (fav > 0) addChip("favourites", "fav");
         v.sortLabels();
         for (Label l : v.labels) addChip(l.name, "label:" + l.id);
-        if (weak > 0) addChip("⚠ Weak " + weak, "weak");
-        if (re > 0) addChip("♻ Reused " + re, "reused");
-        if (exp > 0) addChip("⏰ Expiring " + exp, "expiring");
+        if (weak > 0) addChip("weak", "weak");
+        if (re > 0) addChip("reused", "reused");
+        if (exp > 0) addChip("expiring", "expiring");
         int trash = v.trash().size();
-        if (trash > 0 || filter.equals("trash")) addChip("🗑 Trash " + trash, "trash");
-        if (filter.equals("templates")) addChip("📋 Templates", "templates");
+        if (trash > 0 || filter.equals("trash")) addChip("trash", "trash");
+        if (filter.equals("templates")) addChip("templates", "templates");
+
+        int sel = Math.max(0, pivotKeys.indexOf(filter));
+        if (!pivotKeys.equals(lastKeys) || sel != chipsSel) {
+            lastKeys = new java.util.ArrayList<String>(pivotKeys);
+            chipsSel = sel;
+            chips.set(pivotNames.toArray(new String[0]), sel, new Ui.Cb<Integer>() {
+                public void on(Integer k) { goTo(k); }
+            });
+        }
+        swiper.pages = pivotKeys.size();
+        swiper.page = sel;
 
         shown.clear();
         List<Card> source = filter.equals("trash") ? v.trash() : filter.equals("templates") ? v.templates() : active;
@@ -243,66 +242,71 @@ public class MainActivity extends BaseActivity {
     }
 
     private final java.util.List<String> pivotKeys = new java.util.ArrayList<String>();
+    private final java.util.List<String> pivotNames = new java.util.ArrayList<String>();
+    private java.util.List<String> lastKeys;
+    private int chipsSel = -1;
 
-    /** Pivot swipe: left goes to the next filter, right to the previous one (wraps around like Windows Phone). */
-    private void swipePivot(int dir) {
-        if (pivotKeys.isEmpty()) return;
-        int i = pivotKeys.indexOf(filter);
-        if (i < 0) i = 0;
-        i = (i + dir + pivotKeys.size()) % pivotKeys.size();
-        filter = pivotKeys.get(i);
-        refresh();
+    private void parallax(float pos) {
         View title = header == null ? null : header.findViewWithTag("grove_title");
-        if (title != null) // panorama parallax: the big title slides slower than the content
-            title.animate().translationX(-Math.min(pivotKeys.indexOf(filter) * Ui.dp(this, 70), Ui.dp(this, 280))).setDuration(450)
-                    .setInterpolator(new android.view.animation.DecelerateInterpolator(2f)).start();
-        if (cardsView != null) {
-            cardsView.setSelection(0);
-            cardsView.setTranslationX(dir * Ui.dp(this, 60));
-            cardsView.setAlpha(0f);
-            cardsView.animate().translationX(0).alpha(1f).setDuration(220).start();
-        }
-        final View sel = chips.getChildAt(i);
-        if (sel != null) chips.post(new Runnable() {
-            public void run() { ((android.widget.HorizontalScrollView) chips.getParent()).smoothScrollTo(Math.max(0, sel.getLeft() - Ui.dp(MainActivity.this, 18)), 0); }
-        });
+        if (title != null) title.setTranslationX(-Math.min(pos * Ui.dp(this, 70), Ui.dp(this, 300)));
     }
 
-    private android.view.GestureDetector swipe;
+    /** Tapping a pivot header: slide the list across and move the headers. */
+    private void goTo(final int k) {
+        int cur = pivotKeys.indexOf(filter);
+        if (k == cur || k < 0 || k >= pivotKeys.size() || cardsView == null) return;
+        final int dir = k > cur ? 1 : -1;
+        cardsView.animate().translationX(-dir * frame.getWidth()).setDuration(140).setInterpolator(new android.view.animation.AccelerateInterpolator())
+                .withEndAction(new Runnable() {
+                    public void run() {
+                        applyPage(k);
+                        cardsView.setTranslationX(dir * frame.getWidth() * 0.5f);
+                        cardsView.animate().translationX(0).setDuration(320).setInterpolator(new android.view.animation.DecelerateInterpolator(2.5f)).start();
+                    }
+                }).start();
+    }
+
+    private void applyPage(int k) {
+        filter = pivotKeys.get(k);
+        chipsSel = k;
+        chips.animateTo(k);
+        refresh();
+        cardsView.setSelection(0);
+        View title = header == null ? null : header.findViewWithTag("grove_title");
+        if (title != null) title.animate().translationX(-Math.min(k * Ui.dp(this, 70), Ui.dp(this, 300))).setDuration(450)
+                .setInterpolator(new android.view.animation.DecelerateInterpolator(2.5f)).start();
+    }
 
     private android.view.View.OnTouchListener swipeListener() {
-        swipe = new android.view.GestureDetector(this, new android.view.GestureDetector.SimpleOnGestureListener() {
-            @Override
-            public boolean onFling(android.view.MotionEvent a, android.view.MotionEvent b, float vx, float vy) {
-                if (a == null || b == null) return false;
-                float dx = b.getX() - a.getX(), dy = b.getY() - a.getY();
-                if (Math.abs(dx) < Ui.dp(MainActivity.this, 80) || Math.abs(dx) < Math.abs(dy) * 1.5f || Math.abs(vx) < 400) return false;
-                swipePivot(dx < 0 ? 1 : -1);
-                return true;
+        swiper.onDrag = new Ui.Cb<Float>() {
+            public void on(Float f) {
+                chips.drag(f);
+                parallax(Math.max(0, pivotKeys.indexOf(filter) + f));
             }
-        });
+        };
+        swiper.onPage = new Ui.Cb<Integer>() {
+            public void on(Integer dir) { applyPage(pivotKeys.indexOf(filter) + dir); }
+        };
         return new android.view.View.OnTouchListener() {
             public boolean onTouch(View v, android.view.MotionEvent e) {
-                if (swipe.onTouchEvent(e) && e.getActionMasked() == android.view.MotionEvent.ACTION_UP) {
-                    android.view.MotionEvent c = android.view.MotionEvent.obtain(e);
-                    c.setAction(android.view.MotionEvent.ACTION_CANCEL); // a swipe must not also open the card under the finger
-                    v.onTouchEvent(c);
-                    c.recycle();
+                swiper.content = cardsView;
+                if (swiper.handle(e)) {
+                    if (swiper.justStarted) {
+                        android.view.MotionEvent c = android.view.MotionEvent.obtain(e);
+                        c.setAction(android.view.MotionEvent.ACTION_CANCEL); // don't also scroll or open a card
+                        v.onTouchEvent(c);
+                        c.recycle();
+                    }
                     return true;
                 }
-                return false; // still let the list scroll and handle taps
+                return false;
             }
         };
     }
 
     private void addChip(String label, final String key) {
         pivotKeys.add(key);
-        chips.addView(Ui.chip(this, label, filter.equals(key), new View.OnClickListener() {
-            public void onClick(View v) {
-                filter = key;
-                refresh();
-            }
-        }));
+        pivotNames.add(label);
     }
 
     private void open(Card c) {

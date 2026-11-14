@@ -492,32 +492,187 @@ public final class Ui {
     public static final int PASSWORD_INPUT = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
     public static final int VISIBLE_PASSWORD_INPUT = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
 
-    /** ScrollView that also reports horizontal swipes (for pivots), even when the swipe starts on a button or row. */
-    public static class SwipeScroll extends ScrollView {
-        public Cb<Integer> onSwipe;
-        private final android.view.GestureDetector g;
+    /** Grove Music's pivot headers: 46sp light words; the current one sits at the left edge, the rest are faded. */
+    public static class PivotHeader extends FrameLayout {
+        private final LinearLayout row;
+        private int current;
 
-        public SwipeScroll(Context c) {
+        public PivotHeader(Context c) {
             super(c);
-            g = new android.view.GestureDetector(c, new android.view.GestureDetector.SimpleOnGestureListener() {
-                @Override
-                public boolean onFling(android.view.MotionEvent a, android.view.MotionEvent b, float vx, float vy) {
-                    if (onSwipe == null || a == null || b == null) return false;
-                    float dx = b.getX() - a.getX(), dy = b.getY() - a.getY();
-                    if (Math.abs(dx) < dp(getContext(), 80) || Math.abs(dx) < Math.abs(dy) * 1.5f || Math.abs(vx) < 400) return false;
-                    onSwipe.on(dx < 0 ? 1 : -1);
-                    return true;
-                }
-            });
+            setClipChildren(true);
+            row = horizontal(c);
+            row.setPadding(dp(c, 18), 0, 0, dp(c, 6));
+            addView(row, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
 
         @Override
+        protected void onMeasure(int w, int h) {
+            // let the row be as wide as it likes (it runs off the right edge)
+            row.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+            setMeasuredDimension(MeasureSpec.getSize(w), row.getMeasuredHeight());
+        }
+
+        @Override
+        protected void onLayout(boolean ch, int l, int t, int r, int b) {
+            row.layout(0, 0, row.getMeasuredWidth(), row.getMeasuredHeight());
+        }
+
+        public void set(String[] names, int selected, final Cb<Integer> onTap) {
+            row.removeAllViews();
+            for (int i = 0; i < names.length; i++) {
+                final int idx = i;
+                TextView t = text(getContext(), names[i].toLowerCase(), 46, TEXT, false);
+                t.setTypeface(LIGHT);
+                t.setSingleLine(true);
+                t.setIncludeFontPadding(false);
+                t.setPadding(0, 0, dp(getContext(), 22), 0);
+                t.setOnClickListener(new View.OnClickListener() {
+                    public void onClick(View v) { onTap.on(idx); }
+                });
+                row.addView(t);
+            }
+            current = selected;
+            post(new Runnable() {
+                public void run() { drag(0); }
+            });
+        }
+
+        private float offsetFor(float pos) {
+            int n = row.getChildCount();
+            if (n == 0) return 0;
+            pos = Math.max(0, Math.min(n - 1, pos));
+            int i = (int) Math.floor(pos);
+            float f = pos - i;
+            View a = row.getChildAt(i), b = row.getChildAt(Math.min(n - 1, i + 1));
+            return a.getLeft() - row.getPaddingLeft() + (b.getLeft() - a.getLeft()) * f;
+        }
+
+        /** frac: how far (in pages) the finger has dragged from the current page; negative = towards the previous. */
+        public void drag(float frac) {
+            float pos = current + frac;
+            row.setTranslationX(-offsetFor(pos));
+            for (int k = 0; k < row.getChildCount(); k++)
+                row.getChildAt(k).setAlpha(0.35f + 0.65f * Math.max(0, 1 - Math.abs(pos - k)));
+        }
+
+        public void animateTo(int page) {
+            final float from = current + (-row.getTranslationX() == offsetFor(current) ? 0 : 0);
+            current = page;
+            android.animation.ValueAnimator va = android.animation.ValueAnimator.ofFloat(0, 1);
+            final float startX = row.getTranslationX(), endX = -offsetFor(page);
+            final int pg = page;
+            va.setDuration(450);
+            va.setInterpolator(new android.view.animation.DecelerateInterpolator(2.5f));
+            va.addUpdateListener(new android.animation.ValueAnimator.AnimatorUpdateListener() {
+                public void onAnimationUpdate(android.animation.ValueAnimator a) {
+                    float v = (Float) a.getAnimatedValue();
+                    row.setTranslationX(startX + (endX - startX) * v);
+                    for (int k = 0; k < row.getChildCount(); k++)
+                        row.getChildAt(k).setAlpha(v < 1 ? row.getChildAt(k).getAlpha() + ((k == pg ? 1f : 0.35f) - row.getChildAt(k).getAlpha()) * v : (k == pg ? 1f : 0.35f));
+                }
+            });
+            va.start();
+        }
+    }
+
+    /**
+     * Finger-following horizontal paging (like a ViewPager): the content moves with the finger, and on release it
+     * either settles back or slides off while the next page slides in.
+     */
+    public static class Swiper {
+        public View content;
+        public Cb<Integer> onPage;           // called with +1 / -1 once the old page has slid out
+        public Cb<Float> onDrag;             // fractional pages dragged (for headers and parallax)
+        public int pages = 1, page = 0;
+        public boolean justStarted;
+        private float x0, y0;
+        private boolean decided, dragging;
+        private android.view.VelocityTracker vt;
+
+        public boolean handle(android.view.MotionEvent e) {
+            justStarted = false;
+            if (content == null || pages < 2) return false;
+            int slop = android.view.ViewConfiguration.get(content.getContext()).getScaledTouchSlop();
+            switch (e.getActionMasked()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    x0 = e.getRawX();
+                    y0 = e.getRawY();
+                    decided = dragging = false;
+                    if (vt != null) vt.recycle();
+                    vt = android.view.VelocityTracker.obtain();
+                    vt.addMovement(e);
+                    return false;
+                case android.view.MotionEvent.ACTION_MOVE: {
+                    if (vt != null) vt.addMovement(e);
+                    float dx = e.getRawX() - x0, dy = e.getRawY() - y0;
+                    if (!decided && (Math.abs(dx) > slop || Math.abs(dy) > slop)) {
+                        decided = true;
+                        dragging = Math.abs(dx) > Math.abs(dy) * 1.2f;
+                        justStarted = dragging;
+                    }
+                    if (!dragging) return false;
+                    float w = Math.max(1, content.getWidth());
+                    // resist at the first and last page
+                    if ((page == 0 && dx > 0) || (page == pages - 1 && dx < 0)) dx *= 0.3f;
+                    content.setTranslationX(dx);
+                    if (onDrag != null) onDrag.on(-dx / w);
+                    return true;
+                }
+                case android.view.MotionEvent.ACTION_UP:
+                case android.view.MotionEvent.ACTION_CANCEL: {
+                    if (!dragging) return false;
+                    dragging = false;
+                    float dx = content.getTranslationX(), w = Math.max(1, content.getWidth());
+                    float vx = 0;
+                    if (vt != null) {
+                        vt.addMovement(e);
+                        vt.computeCurrentVelocity(1000);
+                        vx = vt.getXVelocity();
+                    }
+                    int dir = 0;
+                    if (e.getActionMasked() == android.view.MotionEvent.ACTION_UP) {
+                        if (dx < -w / 4 || vx < -900) dir = 1;
+                        else if (dx > w / 4 || vx > 900) dir = -1;
+                    }
+                    if (page + dir < 0 || page + dir >= pages) dir = 0;
+                    if (dir == 0) {
+                        content.animate().translationX(0).setDuration(220).setInterpolator(new android.view.animation.DecelerateInterpolator(2f)).start();
+                        if (onDrag != null) onDrag.on(0f);
+                    } else {
+                        final int d = dir;
+                        content.animate().translationX(-d * w).setDuration(140).setInterpolator(new android.view.animation.AccelerateInterpolator())
+                                .withEndAction(new Runnable() {
+                                    public void run() {
+                                        page += d;
+                                        onPage.on(d);
+                                        content.setTranslationX(d * content.getWidth() * 0.5f);
+                                        content.animate().translationX(0).setDuration(320)
+                                                .setInterpolator(new android.view.animation.DecelerateInterpolator(2.5f)).start();
+                                    }
+                                }).start();
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    /** ScrollView that also reports horizontal swipes (for pivots), even when the swipe starts on a button or row. */
+    public static class SwipeScroll extends ScrollView {
+        public final Swiper swiper = new Swiper();
+
+        public SwipeScroll(Context c) { super(c); }
+
+        @Override
         public boolean dispatchTouchEvent(android.view.MotionEvent e) {
-            if (onSwipe != null && g.onTouchEvent(e) && e.getActionMasked() == android.view.MotionEvent.ACTION_UP) {
-                android.view.MotionEvent c = android.view.MotionEvent.obtain(e);
-                c.setAction(android.view.MotionEvent.ACTION_CANCEL); // the swipe must not also tap whatever is under the finger
-                super.dispatchTouchEvent(c);
-                c.recycle();
+            if (swiper.handle(e)) {
+                if (swiper.justStarted) {
+                    android.view.MotionEvent c = android.view.MotionEvent.obtain(e);
+                    c.setAction(android.view.MotionEvent.ACTION_CANCEL); // stop the row under the finger from being tapped
+                    super.dispatchTouchEvent(c);
+                    c.recycle();
+                }
                 return true;
             }
             return super.dispatchTouchEvent(e);
@@ -562,52 +717,49 @@ public final class Ui {
         for (View h : headers) c.removeView(h);
         final ScrollView sv = (ScrollView) c.getParent();
         ViewGroup root = (ViewGroup) sv.getParent();
-        final LinearLayout strip = horizontal(a);
-        strip.setPadding(dp(a, 18), 0, dp(a, 12), dp(a, 8));
-        final HorizontalScrollView hs = hscroll(a, strip);
-        hs.setTag("grove_pivot");
+        final PivotHeader ph = new PivotHeader(a);
+        ph.setTag("grove_pivot");
         View old = root.findViewWithTag("grove_pivot");
         if (old != null) root.removeView(old); // page rebuilt in place
-        root.addView(hs, root.indexOfChild(sv));
+        root.addView(ph, root.indexOfChild(sv), new LinearLayout.LayoutParams(MATCH, WRAP));
         final String key = a.getClass().getName();
         Integer saved = PIVOT_PAGE.get(key);
         final int[] page = {saved == null ? 0 : Math.min(saved, pages.size() - 1)};
-        final Runnable[] show = new Runnable[1];
-        show[0] = new Runnable() {
+        final Runnable show = new Runnable() {
             public void run() {
                 PIVOT_PAGE.put(key, page[0]);
-                strip.removeAllViews();
-                for (int k = 0; k < names.size(); k++) {
-                    final int kk = k;
-                    strip.addView(chip(a, names.get(k), k == page[0], new View.OnClickListener() {
-                        public void onClick(View v) {
-                            page[0] = kk;
-                            show[0].run();
-                            sv.scrollTo(0, 0);
-                        }
-                    }));
-                }
                 for (int k = 0; k < pages.size(); k++)
                     for (View v : pages.get(k)) v.setVisibility(k == page[0] ? vis.get(v) : View.GONE);
-                strip.post(new Runnable() {
-                    public void run() {
-                        View sel = strip.getChildAt(page[0]);
-                        if (sel != null) hs.smoothScrollTo(Math.max(0, sel.getLeft() - dp(a, 18)), 0);
-                    }
-                });
+                if (sv instanceof SwipeScroll) ((SwipeScroll) sv).swiper.page = page[0];
             }
         };
-        show[0].run();
-        if (sv instanceof SwipeScroll) ((SwipeScroll) sv).onSwipe = new Cb<Integer>() {
-            public void on(Integer dir) {
-                page[0] = (page[0] + dir + pages.size()) % pages.size();
-                show[0].run();
+        ph.set(names.toArray(new String[0]), page[0], new Cb<Integer>() {
+            public void on(Integer k) {
+                if (k == page[0]) return;
+                page[0] = k;
+                show.run();
                 sv.scrollTo(0, 0);
-                c.setTranslationX(dir * dp(a, 60));
-                c.setAlpha(0f);
-                c.animate().translationX(0).alpha(1f).setDuration(220).start();
+                ph.animateTo(k);
             }
-        };
+        });
+        show.run();
+        if (sv instanceof SwipeScroll) {
+            Swiper sw = ((SwipeScroll) sv).swiper;
+            sw.content = c;
+            sw.pages = pages.size();
+            sw.page = page[0];
+            sw.onDrag = new Cb<Float>() {
+                public void on(Float f) { ph.drag(f); }
+            };
+            sw.onPage = new Cb<Integer>() {
+                public void on(Integer dir) {
+                    page[0] += dir;
+                    show.run();
+                    sv.scrollTo(0, 0);
+                    ph.animateTo(page[0]);
+                }
+            };
+        }
     }
 
     /** Windows Phone application-bar menu: the bar expands upward into a list of lowercase commands. */
