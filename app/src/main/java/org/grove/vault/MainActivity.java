@@ -381,20 +381,20 @@ public class MainActivity extends BaseActivity {
     }
 
     private void showMenu(View anchor) {
-        PopupMenu pm = new PopupMenu(this, anchor);
-        Menu m = pm.getMenu();
-        m.add(0, 1, 0, "Password generator");
-        m.add(0, 2, 0, "Labels");
-        m.add(0, 3, 0, filter.equals("templates") ? "Back to cards" : "Templates");
-        if (filter.equals("templates")) m.add(0, 9, 0, "Restore default templates");
-        m.add(0, 4, 0, "Trash");
-        m.add(0, 5, 0, "Sort…");
-        m.add(0, 6, 0, "Backup & import");
-        m.add(0, 7, 0, "Settings");
-        m.add(0, 8, 0, "Lock now");
-        pm.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
-            public boolean onMenuItemClick(MenuItem it) {
-                switch (it.getItemId()) {
+        final java.util.List<Integer> ids = new java.util.ArrayList<Integer>();
+        final java.util.List<String> names = new java.util.ArrayList<String>();
+        ids.add(1); names.add("Password generator");
+        ids.add(2); names.add("Labels");
+        ids.add(3); names.add(filter.equals("templates") ? "Back to cards" : "Templates");
+        if (filter.equals("templates")) { ids.add(9); names.add("Restore default templates"); }
+        ids.add(4); names.add("Trash");
+        ids.add(5); names.add("Sort…");
+        ids.add(6); names.add("Backup & import");
+        ids.add(7); names.add("Settings");
+        ids.add(8); names.add("Lock now");
+        Ui.menu(this, names.toArray(new String[0]), new Ui.Cb<Integer>() {
+            public void on(Integer pick) {
+                switch (ids.get(pick)) {
                     case 1: GeneratorDialog.show(MainActivity.this, null); break;
                     case 2: startActivity(new Intent(MainActivity.this, LabelsActivity.class)); break;
                     case 3: filter = filter.equals("templates") ? "all" : "templates"; refresh(); break;
@@ -422,10 +422,8 @@ public class MainActivity extends BaseActivity {
                         });
                         break;
                 }
-                return true;
             }
         });
-        pm.show();
     }
 
     private void maybeWarnExpiring() {

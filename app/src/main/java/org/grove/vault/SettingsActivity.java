@@ -209,6 +209,7 @@ public class SettingsActivity extends BaseActivity {
         String ver = "";
         try { ver = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception ignored) {}
         c.addView(Ui.row(this, "Grove Vault " + ver, "Open source (GPL-3.0). No ads, no trackers, no accounts. The only internet use is downloading website icons (can be turned off above); your vault never leaves the phone except in files you save. Vault: AES-256-GCM with Argon2id (64 MiB) key derivation; optional key file and YubiKey.", null));
+        Ui.pivotize(this, c, "general");
     }
 
     private static int indexOf(int[] a, int v, int def) {

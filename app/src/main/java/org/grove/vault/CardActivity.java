@@ -144,11 +144,11 @@ public class CardActivity extends BaseActivity {
         TextView meta = Ui.text(this, "Created " + df.format(new Date(card.created)) + "\nModified " + df.format(new Date(card.modified)), 12, Ui.SUB, false);
         meta.setPadding(Ui.dp(this, 20), Ui.dp(this, 20), Ui.dp(this, 20), 0);
         c.addView(meta);
+        Ui.pivotize(this, c, "details");
     }
 
     private LinearLayout box(LinearLayout parent) {
         LinearLayout b = Ui.vertical(this);
-        b.setBackground(Ui.round(Ui.SURFACE, Ui.dp(this, 16)));
         b.setClipToOutline(true);
         parent.addView(b, Ui.margins(this, Ui.MATCH, Ui.WRAP, 16, 4, 16, 4));
         return b;

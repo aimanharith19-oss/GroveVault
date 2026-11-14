@@ -170,6 +170,7 @@ public class BackupActivity extends BaseActivity {
                 });
             }
         }));
+        Ui.pivotize(this, c, "backup");
     }
 
     private void open(int req) {

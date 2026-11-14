@@ -407,6 +407,7 @@ public final class Ui {
     public static TextView section(Context c, String s) {
         TextView t = text(c, s.toLowerCase(), 20, ACCENT, false);
         t.setPadding(dp(c, 20), dp(c, 22), dp(c, 20), dp(c, 4));
+        t.setTag("grove_section"); // pivotize() turns these into pivot pages
         return t;
     }
 
@@ -487,8 +488,182 @@ public final class Ui {
     public static final int PASSWORD_INPUT = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
     public static final int VISIBLE_PASSWORD_INPUT = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
 
+    /** ScrollView that also reports horizontal swipes (for pivots), even when the swipe starts on a button or row. */
+    public static class SwipeScroll extends ScrollView {
+        public Cb<Integer> onSwipe;
+        private final android.view.GestureDetector g;
+
+        public SwipeScroll(Context c) {
+            super(c);
+            g = new android.view.GestureDetector(c, new android.view.GestureDetector.SimpleOnGestureListener() {
+                @Override
+                public boolean onFling(android.view.MotionEvent a, android.view.MotionEvent b, float vx, float vy) {
+                    if (onSwipe == null || a == null || b == null) return false;
+                    float dx = b.getX() - a.getX(), dy = b.getY() - a.getY();
+                    if (Math.abs(dx) < dp(getContext(), 80) || Math.abs(dx) < Math.abs(dy) * 1.5f || Math.abs(vx) < 400) return false;
+                    onSwipe.on(dx < 0 ? 1 : -1);
+                    return true;
+                }
+            });
+        }
+
+        @Override
+        public boolean dispatchTouchEvent(android.view.MotionEvent e) {
+            if (onSwipe != null && g.onTouchEvent(e) && e.getActionMasked() == android.view.MotionEvent.ACTION_UP) {
+                android.view.MotionEvent c = android.view.MotionEvent.obtain(e);
+                c.setAction(android.view.MotionEvent.ACTION_CANCEL); // the swipe must not also tap whatever is under the finger
+                super.dispatchTouchEvent(c);
+                c.recycle();
+                return true;
+            }
+            return super.dispatchTouchEvent(e);
+        }
+    }
+
+    private static final java.util.HashMap<String, Integer> PIVOT_PAGE = new java.util.HashMap<String, Integer>();
+
+    /**
+     * Windows Phone pivot: splits a scrolling page at its section headers into pages. The section names become the
+     * big pivot headers at the top (tap one, or swipe left/right to move between them). Content before the first
+     * section becomes a page called firstName.
+     */
+    public static void pivotize(final Activity a, final LinearLayout c, String firstName) {
+        if (!(c.getParent() instanceof ScrollView) || !(c.getParent().getParent() instanceof ViewGroup)) return;
+        final java.util.List<String> names = new java.util.ArrayList<String>();
+        final java.util.List<java.util.List<View>> pages = new java.util.ArrayList<java.util.List<View>>();
+        final java.util.HashMap<View, Integer> vis = new java.util.HashMap<View, Integer>();
+        java.util.List<View> headers = new java.util.ArrayList<View>();
+        java.util.List<View> cur = new java.util.ArrayList<View>();
+        String curName = firstName;
+        for (int i = 0; i < c.getChildCount(); i++) {
+            View v = c.getChildAt(i);
+            if ("grove_section".equals(v.getTag())) {
+                if (!cur.isEmpty()) {
+                    names.add(curName);
+                    pages.add(cur);
+                }
+                cur = new java.util.ArrayList<View>();
+                curName = ((TextView) v).getText().toString();
+                headers.add(v);
+            } else {
+                cur.add(v);
+                vis.put(v, v.getVisibility());
+            }
+        }
+        if (!cur.isEmpty()) {
+            names.add(curName);
+            pages.add(cur);
+        }
+        if (pages.size() < 2) return;
+        for (View h : headers) c.removeView(h);
+        final ScrollView sv = (ScrollView) c.getParent();
+        ViewGroup root = (ViewGroup) sv.getParent();
+        final LinearLayout strip = horizontal(a);
+        strip.setPadding(dp(a, 18), 0, dp(a, 12), dp(a, 8));
+        final HorizontalScrollView hs = hscroll(a, strip);
+        hs.setTag("grove_pivot");
+        View old = root.findViewWithTag("grove_pivot");
+        if (old != null) root.removeView(old); // page rebuilt in place
+        root.addView(hs, root.indexOfChild(sv));
+        final String key = a.getClass().getName();
+        Integer saved = PIVOT_PAGE.get(key);
+        final int[] page = {saved == null ? 0 : Math.min(saved, pages.size() - 1)};
+        final Runnable[] show = new Runnable[1];
+        show[0] = new Runnable() {
+            public void run() {
+                PIVOT_PAGE.put(key, page[0]);
+                strip.removeAllViews();
+                for (int k = 0; k < names.size(); k++) {
+                    final int kk = k;
+                    strip.addView(chip(a, names.get(k), k == page[0], new View.OnClickListener() {
+                        public void onClick(View v) {
+                            page[0] = kk;
+                            show[0].run();
+                            sv.scrollTo(0, 0);
+                        }
+                    }));
+                }
+                for (int k = 0; k < pages.size(); k++)
+                    for (View v : pages.get(k)) v.setVisibility(k == page[0] ? vis.get(v) : View.GONE);
+                strip.post(new Runnable() {
+                    public void run() {
+                        View sel = strip.getChildAt(page[0]);
+                        if (sel != null) hs.smoothScrollTo(Math.max(0, sel.getLeft() - dp(a, 18)), 0);
+                    }
+                });
+            }
+        };
+        show[0].run();
+        if (sv instanceof SwipeScroll) ((SwipeScroll) sv).onSwipe = new Cb<Integer>() {
+            public void on(Integer dir) {
+                page[0] = (page[0] + dir + pages.size()) % pages.size();
+                show[0].run();
+                sv.scrollTo(0, 0);
+                c.setTranslationX(dir * dp(a, 60));
+                c.setAlpha(0f);
+                c.animate().translationX(0).alpha(1f).setDuration(220).start();
+            }
+        };
+    }
+
+    /** Windows Phone application-bar menu: the bar expands upward into a list of lowercase commands. */
+    public static void menu(Activity a, String[] items, final Cb<Integer> cb) {
+        final android.app.Dialog d = new android.app.Dialog(a, dark ? R.style.MetroDialogDark : R.style.MetroDialogLight);
+        d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        LinearLayout l = vertical(a);
+        l.setBackgroundColor(dark ? blend(0xFF000000, ACCENT, 0.12f) : blend(0xFFFFFFFF, ACCENT, 0.08f));
+        l.setPadding(0, dp(a, 14), 0, dp(a, 18));
+        for (int i = 0; i < items.length; i++) {
+            final int idx = i;
+            TextView t = text(a, items[i].toLowerCase(), 21, TEXT, false);
+            t.setPadding(dp(a, 24), dp(a, 11), dp(a, 24), dp(a, 11));
+            t.setClickable(true);
+            tilt(t);
+            t.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    d.dismiss();
+                    cb.on(idx);
+                }
+            });
+            l.addView(t, lp(MATCH, WRAP));
+        }
+        d.setContentView(l);
+        if (d.getWindow() != null) {
+            d.getWindow().setGravity(Gravity.BOTTOM);
+            d.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        d.show();
+    }
+
+    /** Lowercase Windows Phone list for pickers; the selected item (if any) is shown in the accent colour. */
+    private static void pickList(Context c, String title, String[] items, int selected, boolean cancel, final Cb<Integer> cb) {
+        LinearLayout l = vertical(c);
+        l.setPadding(0, dp(c, 4), 0, dp(c, 8));
+        AlertDialog.Builder b = dialog(c, title);
+        ScrollView sv = new ScrollView(c);
+        sv.addView(l);
+        b.setView(sv);
+        if (cancel) b.setNegativeButton("Cancel", null);
+        final AlertDialog d = b.create();
+        for (int i = 0; i < items.length; i++) {
+            final int idx = i;
+            TextView t = text(c, items[i].toLowerCase(), 21, i == selected ? ACCENT : TEXT, false);
+            t.setPadding(dp(c, 24), dp(c, 10), dp(c, 24), dp(c, 10));
+            t.setClickable(true);
+            tilt(t);
+            t.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    d.dismiss();
+                    cb.on(idx);
+                }
+            });
+            l.addView(t, lp(MATCH, WRAP));
+        }
+        d.show();
+    }
+
     public static ScrollView scroll(Context c, View content) {
-        ScrollView s = new ScrollView(c);
+        ScrollView s = new SwipeScroll(c);
         s.setFillViewport(true);
         s.addView(content);
         return s;
@@ -628,20 +803,11 @@ public final class Ui {
     }
 
     public static void choose(Context c, String title, String[] items, final Cb<Integer> cb) {
-        dialog(c, title).setItems(items, new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface d, int w) {
-                cb.on(w);
-            }
-        }).show();
+        pickList(c, title, items, -1, false, cb);
     }
 
     public static void single(Context c, String title, String[] items, int checked, final Cb<Integer> cb) {
-        dialog(c, title).setSingleChoiceItems(items, checked, new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface d, int w) {
-                d.dismiss();
-                cb.on(w);
-            }
-        }).setNegativeButton("Cancel", null).show();
+        pickList(c, title, items, checked, true, cb);
     }
 
     public static void multi(Context c, String title, String[] items, final boolean[] checked, final Runnable done) {

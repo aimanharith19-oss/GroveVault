@@ -215,6 +215,7 @@ public class EditActivity extends BaseActivity {
             hint.setPadding(Ui.dp(this, 20), 0, Ui.dp(this, 20), 0);
             content.addView(hint);
         }
+        Ui.pivotize(this, content, "card");
     }
 
     private int inputTypeFor(String type) {

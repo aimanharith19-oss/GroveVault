@@ -81,6 +81,7 @@ public class SecurityActivity extends BaseActivity {
         TextView t = Ui.text(this, "1. Install YubiKey Manager on a computer.\n2. Applications → OTP → Long Touch (Slot 2) → Configure → Challenge-response → Generate a secret key → Finish. Tick \"Require touch\" for extra safety.\n3. Program a second (backup) YubiKey with the same secret, or add it here as another key.\n\nWorks with YubiKey 5 NFC (tap on the back of the phone) or any YubiKey over USB. Without a working key, the vault can't be opened, so always keep a backup key.", 13, Ui.SUB, false);
         t.setPadding(Ui.dp(this, 20), 0, Ui.dp(this, 20), 0);
         c.addView(t);
+        Ui.pivotize(this, c, "unlock");
     }
 
     // ---------------------------------------------------------------- wizard
