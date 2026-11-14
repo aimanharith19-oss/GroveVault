@@ -628,6 +628,7 @@ public final class Ui {
             l.addView(t, lp(MATCH, WRAP));
         }
         d.setContentView(l);
+        frame(d);
         if (d.getWindow() != null) {
             d.getWindow().setGravity(Gravity.BOTTOM);
             d.getWindow().setWindowAnimations(R.style.MetroBottomAnim);
@@ -734,6 +735,7 @@ public final class Ui {
             @Override
             public AlertDialog create() {
                 final AlertDialog d = super.create();
+                frame(d); // place it before it is shown, so it doesn't jump from the centre to the top
                 d.setOnShowListener(new DialogInterface.OnShowListener() {
                     public void onShow(DialogInterface di) { metro(d); }
                 });
@@ -749,11 +751,15 @@ public final class Ui {
         return b;
     }
 
+    /** Full-width at the top, and hidden from screenshots/recordings like the rest of the app. */
+    static void frame(android.app.Dialog d) {
+        if (d.getWindow() == null) return;
+        d.getWindow().setGravity(Gravity.TOP);
+        d.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        if (!Prefs.allowScreenshots(d.getContext())) d.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+    }
+
     static void metro(AlertDialog d) {
-        if (d.getWindow() != null) {
-            d.getWindow().setGravity(Gravity.TOP);
-            d.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        }
         for (int w : new int[]{DialogInterface.BUTTON_POSITIVE, DialogInterface.BUTTON_NEGATIVE, DialogInterface.BUTTON_NEUTRAL}) {
             android.widget.Button btn = d.getButton(w);
             if (btn == null) continue;
@@ -761,13 +767,15 @@ public final class Ui {
             btn.setText(btn.getText().toString().toLowerCase());
             btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
             btn.setTextColor(TEXT);
+            // border drawn inset inside the button's own bounds, so the button bar can never clip an edge
+            int in = dp(d.getContext(), 5), sw = dp(d.getContext(), 2);
             android.graphics.drawable.StateListDrawable st = new android.graphics.drawable.StateListDrawable();
-            st.addState(new int[]{android.R.attr.state_pressed}, stroke(ACCENT, ACCENT, d.getContext().getResources().getDisplayMetrics().density > 0 ? dp(d.getContext(), 2) : 2, 0));
-            st.addState(new int[]{}, stroke(0, TEXT, dp(d.getContext(), 2), 0));
+            st.addState(new int[]{android.R.attr.state_pressed}, new android.graphics.drawable.InsetDrawable(stroke(ACCENT, ACCENT, sw, 0), in));
+            st.addState(new int[]{}, new android.graphics.drawable.InsetDrawable(stroke(0, TEXT, sw, 0), in));
             btn.setBackground(st);
-            ViewGroup.LayoutParams p = btn.getLayoutParams();
-            if (p instanceof ViewGroup.MarginLayoutParams) ((ViewGroup.MarginLayoutParams) p).setMargins(dp(d.getContext(), 6), dp(d.getContext(), 4), dp(d.getContext(), 6), dp(d.getContext(), 10));
-            btn.setMinWidth(dp(d.getContext(), 96));
+            btn.setMinWidth(dp(d.getContext(), 104));
+            btn.setMinHeight(dp(d.getContext(), 52));
+            btn.setPadding(dp(d.getContext(), 18), 0, dp(d.getContext(), 18), 0);
         }
     }
 
@@ -826,9 +834,11 @@ public final class Ui {
     /** Runs work off the main thread with a progress dialog, then delivers the result (or shows the error). */
     @SuppressWarnings("deprecation")
     public static <T> void bg(final Activity a, String message, final Task<T> task, final Cb<T> done, final Cb<Exception> failed) {
-        final ProgressDialog pd = new ProgressDialog(a);
-        pd.setMessage(message);
+        final ProgressDialog pd = new ProgressDialog(a, dark ? R.style.MetroDialogDark : R.style.MetroDialogLight);
+        pd.setMessage(message.toLowerCase());
         pd.setCancelable(false);
+        pd.create();
+        frame(pd);
         pd.show();
         new Thread(new Runnable() {
             public void run() {
