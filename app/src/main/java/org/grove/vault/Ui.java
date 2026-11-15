@@ -359,8 +359,16 @@ public final class Ui {
                 FrameLayout clip = new FrameLayout(a) {
                     @Override
                     protected void onMeasure(int w, int hs) {
-                        View c = getChildAt(0);
+                        TextView c = (TextView) getChildAt(0);
+                        // shrink the title (from 72sp) until the whole word fits on the screen, on every tab
+                        int avail = MeasureSpec.getSize(w) - dp(getContext(), 16);
+                        c.setTextSize(TypedValue.COMPLEX_UNIT_SP, 72);
                         c.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+                        if (avail > 0 && c.getMeasuredWidth() > avail) {
+                            float px = c.getTextSize() * avail / c.getMeasuredWidth();
+                            c.setTextSize(TypedValue.COMPLEX_UNIT_PX, px);
+                            c.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+                        }
                         setMeasuredDimension(MeasureSpec.getSize(w), c.getMeasuredHeight());
                     }
 
@@ -371,6 +379,9 @@ public final class Ui {
                     }
                 };
                 t.setHorizontallyScrolling(false);
+                clip.setClipChildren(false); // the small parallax drift moves into the left margin, not under a clip
+                h.setClipChildren(false);
+                h.setClipToPadding(false);
                 clip.addView(t);
                 h.addView(clip, lp(MATCH, WRAP));
             }
