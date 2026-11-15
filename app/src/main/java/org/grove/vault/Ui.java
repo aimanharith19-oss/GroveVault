@@ -360,15 +360,7 @@ public final class Ui {
                     @Override
                     protected void onMeasure(int w, int hs) {
                         TextView c = (TextView) getChildAt(0);
-                        // shrink the title (from 72sp) until the whole word fits on the screen, on every tab
-                        int avail = MeasureSpec.getSize(w) - dp(getContext(), 16);
-                        c.setTextSize(TypedValue.COMPLEX_UNIT_SP, 72);
                         c.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
-                        if (avail > 0 && c.getMeasuredWidth() > avail) {
-                            float px = c.getTextSize() * avail / c.getMeasuredWidth();
-                            c.setTextSize(TypedValue.COMPLEX_UNIT_PX, px);
-                            c.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
-                        }
                         setMeasuredDimension(MeasureSpec.getSize(w), c.getMeasuredHeight());
                     }
 

@@ -248,7 +248,7 @@ public class MainActivity extends BaseActivity {
 
     private void parallax(float pos) {
         View title = header == null ? null : header.findViewWithTag("grove_title");
-        if (title != null) title.setTranslationX(-Math.min(pos * Ui.dp(this, 4), Ui.dp(this, 10)));
+        if (title != null) title.setTranslationX(-pos * Ui.dp(this, 70));
     }
 
     /** Tapping a pivot header: slide the list across and move the headers. */
@@ -273,7 +273,7 @@ public class MainActivity extends BaseActivity {
         refresh();
         cardsView.setSelection(0);
         View title = header == null ? null : header.findViewWithTag("grove_title");
-        if (title != null) title.animate().translationX(-Math.min(k * Ui.dp(this, 4), Ui.dp(this, 10))).setDuration(450)
+        if (title != null) title.animate().translationX(-k * Ui.dp(this, 70)).setDuration(450)
                 .setInterpolator(new android.view.animation.DecelerateInterpolator(2.5f)).start();
     }
 
