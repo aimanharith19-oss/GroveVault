@@ -572,7 +572,10 @@ public final class Ui {
         }
 
         /** frac: how far (in pages) the finger has dragged from the current page; negative = towards the previous. */
+        private android.animation.ValueAnimator anim;
+
         public void drag(float frac) {
+            if (anim != null) { anim.cancel(); anim = null; }
             float pos = current + frac;
             row.setTranslationX(-offsetFor(pos));
             for (int k = 0; k < row.getChildCount(); k++)
@@ -582,7 +585,9 @@ public final class Ui {
         public void animateTo(int page) {
             final float from = current + (-row.getTranslationX() == offsetFor(current) ? 0 : 0);
             current = page;
+            if (anim != null) anim.cancel();
             android.animation.ValueAnimator va = android.animation.ValueAnimator.ofFloat(0, 1);
+            anim = va;
             final float startX = row.getTranslationX(), endX = -offsetFor(page);
             final int pg = page;
             va.setDuration(450);
@@ -609,8 +614,9 @@ public final class Ui {
         public Cb<Float> onDrag;             // fractional pages dragged (for headers and parallax)
         public int pages = 1, page = 0;
         public boolean justStarted;
-        private float x0, y0;
+        private float x0, y0, base;
         private boolean decided, dragging;
+        private Runnable pending;
         private android.view.VelocityTracker vt;
 
         public boolean handle(android.view.MotionEvent e) {
@@ -619,6 +625,15 @@ public final class Ui {
             int slop = android.view.ViewConfiguration.get(content.getContext()).getScaledTouchSlop();
             switch (e.getActionMasked()) {
                 case android.view.MotionEvent.ACTION_DOWN:
+                    // a new touch during a page change: finish the change at once, then follow the new finger
+                    content.animate().cancel();
+                    if (pending != null) {
+                        Runnable r = pending;
+                        pending = null;
+                        r.run();
+                        content.setTranslationX(0);
+                    }
+                    base = content.getTranslationX();
                     x0 = e.getRawX();
                     y0 = e.getRawY();
                     decided = dragging = false;
@@ -634,18 +649,32 @@ public final class Ui {
                         dragging = Math.abs(dx) > Math.abs(dy) * 1.2f;
                         justStarted = dragging;
                     }
-                    if (!dragging) return false;
+                    if (!dragging) {
+                        if (!decided) return false;
+                        // went vertical: let the list scroll; snap any half-finished slide back
+                        if (base != 0) { content.setTranslationX(0); base = 0; if (onDrag != null) onDrag.on(0f); }
+                        return false;
+                    }
                     float w = Math.max(1, content.getWidth());
+                    dx += base;
                     // resist at the first and last page
                     if ((page == 0 && dx > 0) || (page == pages - 1 && dx < 0)) dx *= 0.3f;
+                    dx = Math.max(-w, Math.min(w, dx));
                     content.setTranslationX(dx);
                     if (onDrag != null) onDrag.on(-dx / w);
                     return true;
                 }
                 case android.view.MotionEvent.ACTION_UP:
                 case android.view.MotionEvent.ACTION_CANCEL: {
-                    if (!dragging) return false;
+                    if (!dragging) {
+                        if (base != 0) {
+                            content.animate().translationX(0).setDuration(200).start();
+                            base = 0;
+                        }
+                        return false;
+                    }
                     dragging = false;
+                    base = 0;
                     float dx = content.getTranslationX(), w = Math.max(1, content.getWidth());
                     float vx = 0;
                     if (vt != null) {
@@ -664,11 +693,17 @@ public final class Ui {
                         if (onDrag != null) onDrag.on(0f);
                     } else {
                         final int d = dir;
-                        content.animate().translationX(-d * w).setDuration(140).setInterpolator(new android.view.animation.AccelerateInterpolator())
+                        page += d; // count it now, so a quick next swipe goes on from the new page
+                        final Runnable change = new Runnable() {
+                            public void run() { onPage.on(d); }
+                        };
+                        pending = change;
+                        content.animate().translationX(-d * w).setDuration(120).setInterpolator(new android.view.animation.AccelerateInterpolator())
                                 .withEndAction(new Runnable() {
                                     public void run() {
-                                        page += d;
-                                        onPage.on(d);
+                                        if (pending != change) return;
+                                        pending = null;
+                                        change.run();
                                         content.setTranslationX(d * content.getWidth() * 0.5f);
                                         content.animate().translationX(0).setDuration(320)
                                                 .setInterpolator(new android.view.animation.DecelerateInterpolator(2.5f)).start();

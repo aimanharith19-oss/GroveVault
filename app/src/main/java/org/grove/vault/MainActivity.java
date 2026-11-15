@@ -246,15 +246,30 @@ public class MainActivity extends BaseActivity {
     private java.util.List<String> lastKeys;
     private int chipsSel = -1;
 
+    /**
+     * Panorama parallax spread over however many tabs there are: across all of them the title slides by half its
+     * width (or by what doesn't fit on screen, if more), like the Windows Phone panorama.
+     */
+    private float titleShift(View title, float pos) {
+        int n = pivotKeys.size();
+        if (n < 2) return 0;
+        float avail = header.getWidth() - header.getPaddingLeft();
+        float max = Math.max(title.getWidth() * 0.5f, title.getWidth() - avail + Ui.dp(this, 24));
+        return -max * Math.max(0, Math.min(n - 1, pos)) / (n - 1);
+    }
+
     private void parallax(float pos) {
         View title = header == null ? null : header.findViewWithTag("grove_title");
-        if (title != null) title.setTranslationX(-pos * Ui.dp(this, 70));
+        if (title == null) return;
+        title.animate().cancel();
+        title.setTranslationX(titleShift(title, pos));
     }
 
     /** Tapping a pivot header: slide the list across and move the headers. */
     private void goTo(final int k) {
         int cur = pivotKeys.indexOf(filter);
         if (k == cur || k < 0 || k >= pivotKeys.size() || cardsView == null) return;
+        cardsView.animate().cancel();
         final int dir = k > cur ? 1 : -1;
         cardsView.animate().translationX(-dir * frame.getWidth()).setDuration(140).setInterpolator(new android.view.animation.AccelerateInterpolator())
                 .withEndAction(new Runnable() {
@@ -273,7 +288,7 @@ public class MainActivity extends BaseActivity {
         refresh();
         cardsView.setSelection(0);
         View title = header == null ? null : header.findViewWithTag("grove_title");
-        if (title != null) title.animate().translationX(-k * Ui.dp(this, 70)).setDuration(450)
+        if (title != null) title.animate().translationX(titleShift(title, k)).setDuration(450)
                 .setInterpolator(new android.view.animation.DecelerateInterpolator(2.5f)).start();
     }
 
