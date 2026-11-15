@@ -333,22 +333,22 @@ public final class Ui {
      * back=false marks the hub page, which gets the bigger "panorama" title.
      */
     public static LinearLayout topBar(final Activity a, String title, boolean back, View... actions) {
-        // same header as Grove Music: "GROVE VAULT" 15sp semibold + 56sp light page title; the hub gets the
+        // same header as Grove Music: "GROVEVAULT" 15sp semibold + 56sp light page title; the hub gets GroveBook's
         // 84sp panorama title that runs off the right edge
         LinearLayout h = vertical(a);
         h.setClipChildren(true);
         h.setPadding(back ? dp(a, 20) : dp(a, 12), back ? dp(a, 14) : dp(a, 4), dp(a, 0), dp(a, 4));
         if (back) {
-            TextView app = text(a, "GROVE VAULT", 15, TEXT, true);
+            TextView app = text(a, "GROVEVAULT", 15, TEXT, true);
             h.addView(app);
         }
         if (title != null && title.length() > 0) {
-            float sp = back ? 56 : 84;
+            float sp = back ? 56 : 72;
             TextView t = text(a, title.toLowerCase(), sp, TEXT, false);
             t.setTypeface(LIGHT);
             t.setSingleLine(true);
             t.setHorizontallyScrolling(true);
-            t.setLetterSpacing(back ? -0.01f : -3f / 84f);
+            t.setLetterSpacing(back ? -0.01f : -3f / 72f);
             t.setIncludeFontPadding(false);
             t.setPadding(0, 0, 0, dp(a, 8));
             t.setTag("grove_title");
@@ -521,7 +521,7 @@ public final class Ui {
             row.removeAllViews();
             for (int i = 0; i < names.length; i++) {
                 final int idx = i;
-                TextView t = text(getContext(), names[i].toLowerCase(), 46, TEXT, false);
+                TextView t = text(getContext(), names[i].toLowerCase(), 40, TEXT, false);
                 t.setTypeface(LIGHT);
                 t.setSingleLine(true);
                 t.setIncludeFontPadding(false);

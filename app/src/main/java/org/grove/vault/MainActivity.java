@@ -82,7 +82,7 @@ public class MainActivity extends BaseActivity {
                 showCards();
             }
         });
-        LinearLayout bar = Ui.topBar(this, "grove vault", false, addBtn, searchBtn, viewBtn, menuBtn);
+        LinearLayout bar = Ui.topBar(this, "grovevault", false, addBtn, searchBtn, viewBtn, menuBtn);
         header = bar;
         root.addView(bar);
         search = Ui.edit(this, "Search cards", InputType.TYPE_CLASS_TEXT);
@@ -248,7 +248,7 @@ public class MainActivity extends BaseActivity {
 
     private void parallax(float pos) {
         View title = header == null ? null : header.findViewWithTag("grove_title");
-        if (title != null) title.setTranslationX(-Math.min(pos * Ui.dp(this, 70), Ui.dp(this, 300)));
+        if (title != null) title.setTranslationX(-pos * Ui.dp(this, 60));
     }
 
     /** Tapping a pivot header: slide the list across and move the headers. */
@@ -273,7 +273,7 @@ public class MainActivity extends BaseActivity {
         refresh();
         cardsView.setSelection(0);
         View title = header == null ? null : header.findViewWithTag("grove_title");
-        if (title != null) title.animate().translationX(-Math.min(k * Ui.dp(this, 70), Ui.dp(this, 300))).setDuration(450)
+        if (title != null) title.animate().translationX(-k * Ui.dp(this, 60)).setDuration(450)
                 .setInterpolator(new android.view.animation.DecelerateInterpolator(2.5f)).start();
     }
 
