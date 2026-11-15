@@ -352,7 +352,28 @@ public final class Ui {
             t.setIncludeFontPadding(false);
             t.setPadding(0, 0, 0, dp(a, 8));
             t.setTag("grove_title");
-            h.addView(t, lp(MATCH, WRAP));
+            if (back) h.addView(t, lp(MATCH, WRAP));
+            else {
+                // the panorama title is measured at its full width (wider than the screen), so sliding it left
+                // never cuts the end of the word off
+                FrameLayout clip = new FrameLayout(a) {
+                    @Override
+                    protected void onMeasure(int w, int hs) {
+                        View c = getChildAt(0);
+                        c.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+                        setMeasuredDimension(MeasureSpec.getSize(w), c.getMeasuredHeight());
+                    }
+
+                    @Override
+                    protected void onLayout(boolean ch, int l, int tp, int r, int b) {
+                        View c = getChildAt(0);
+                        c.layout(0, 0, c.getMeasuredWidth(), c.getMeasuredHeight());
+                    }
+                };
+                t.setHorizontallyScrolling(false);
+                clip.addView(t);
+                h.addView(clip, lp(MATCH, WRAP));
+            }
         }
         appBar(a, actions);
         return h;
