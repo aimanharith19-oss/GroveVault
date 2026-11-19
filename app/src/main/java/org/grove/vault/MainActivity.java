@@ -387,6 +387,39 @@ public class MainActivity extends BaseActivity {
         });
     }
 
+    /** Finds logins with the same username and password and combines each set into one card (others → Trash). */
+    private void combineDuplicates() {
+        final List<List<Card>> groups = org.grove.vault.core.Dedupe.groups(Session.vault());
+        if (groups.isEmpty()) {
+            Ui.message(this, "No duplicates", "No logins share the same username and password.");
+            return;
+        }
+        String[] names = new String[groups.size()];
+        final boolean[] on = new boolean[groups.size()];
+        for (int i = 0; i < groups.size(); i++) {
+            StringBuilder b = new StringBuilder();
+            for (Card c : groups.get(i)) b.append(b.length() == 0 ? "" : " + ").append(c.title.length() == 0 ? "(untitled)" : c.title);
+            String user = groups.get(i).get(0).login();
+            names[i] = b + (user.length() > 0 ? "  ·  " + user : "");
+            on[i] = true;
+        }
+        Ui.multi(this, "Combine into one card each", names, on, new Runnable() {
+            public void run() {
+                int n = 0;
+                for (int i = 0; i < groups.size(); i++) {
+                    if (!on[i]) continue;
+                    org.grove.vault.core.Dedupe.merge(groups.get(i));
+                    n += groups.get(i).size() - 1;
+                }
+                if (n == 0) return;
+                if (Session.saveOrToast(MainActivity.this)) {
+                    refresh();
+                    Ui.toast(MainActivity.this, "Combined " + n + " login" + (n == 1 ? "" : "s") + ". The old cards are in Trash");
+                }
+            }
+        });
+    }
+
     private void showMenu(View anchor) {
         final java.util.List<Integer> ids = new java.util.ArrayList<Integer>();
         final java.util.List<String> names = new java.util.ArrayList<String>();
@@ -396,6 +429,7 @@ public class MainActivity extends BaseActivity {
         if (filter.equals("templates")) { ids.add(9); names.add("Restore default templates"); }
         ids.add(4); names.add("Trash");
         ids.add(5); names.add("Sort…");
+        ids.add(10); names.add("Combine duplicate logins");
         ids.add(6); names.add("Backup & import");
         ids.add(7); names.add("Settings");
         ids.add(8); names.add("Lock now");
@@ -414,6 +448,7 @@ public class MainActivity extends BaseActivity {
                     case 6: startActivity(new Intent(MainActivity.this, BackupActivity.class)); break;
                     case 7: startActivity(new Intent(MainActivity.this, SettingsActivity.class)); break;
                     case 8: Session.lock(); startActivity(new Intent(MainActivity.this, LockActivity.class)); finish(); break;
+                    case 10: combineDuplicates(); break;
                     case 9:
                         Ui.confirm(MainActivity.this, "Restore default templates?", "Missing built-in templates will be added back. Your own templates are kept.", "Restore", new Runnable() {
                             public void run() {

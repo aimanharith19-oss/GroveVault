@@ -185,6 +185,9 @@ public class SettingsActivity extends BaseActivity {
                 }
             }
         }));
+        Ui.switchRow(this, c, "Add new passkeys to my existing login", "When a site makes a passkey and you already have one login there with the same username, it's added to that card instead of a new one. Otherwise you choose the card", Prefs.p(this).getBoolean("pk_attach_auto", true), new Ui.Cb<Boolean>() {
+            public void on(Boolean b) { Prefs.put(SettingsActivity.this, "pk_attach_auto", b); }
+        });
         final String[] afStyles = {"Keyboard chips + pop-up", "Pop-up only"};
         final String[] afVals = {"both", "popup"};
         int afi = "popup".equals(Prefs.p(this).getString("af_style", "both")) ? 1 : 0;

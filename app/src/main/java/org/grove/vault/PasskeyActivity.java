@@ -201,27 +201,47 @@ public class PasskeyActivity extends Activity {
             createError(DOM_SECURITY, e.getMessage());
             return;
         }
-        // Choose where to save: a matching card or a new one.
+        // Choose where to save: preferably an existing login (same site / same app, same username) instead of a new card.
+        final String callerPkg = request.getCallingAppInfo() == null ? "" : request.getCallingAppInfo().getPackageName();
         final List<Card> candidates = new ArrayList<Card>();
+        final java.util.Map<Card, Integer> score = new java.util.HashMap<Card, Integer>();
+        String site = Card.baseDomain(rpId);
         for (Card c : Session.vault().activeCards()) {
-            for (Field f : c.fields) {
-                if (Field.WEBSITE.equals(f.type) && Card.baseDomain(Card.domainOf(f.value)).equalsIgnoreCase(Card.baseDomain(rpId))) {
-                    candidates.add(c);
-                    break;
-                }
-            }
+            if (c.template) continue;
+            int sc = 0;
+            for (Field f : c.fields)
+                if (Field.WEBSITE.equals(f.type) && f.value.length() > 0 && Card.baseDomain(Card.domainOf(f.value)).equalsIgnoreCase(site)) { sc = 2; break; }
+            if (origin[0].toString().startsWith("android:") && c.apps.contains(callerPkg)) sc = Math.max(sc, 2);
+            if (sc == 0) continue;
+            if (userName.length() > 0 && c.login().trim().equalsIgnoreCase(userName.trim())) sc += 2;
+            candidates.add(c);
+            score.put(c, sc);
         }
-        final String[] items = new String[candidates.size() + 1];
-        items[0] = "➕  New card “" + rpId + "”";
-        for (int i = 0; i < candidates.size(); i++) items[i + 1] = "Add to “" + candidates.get(i).title + "”" + (candidates.get(i).login().length() > 0 ? " (" + candidates.get(i).login() + ")" : "");
+        java.util.Collections.sort(candidates, new java.util.Comparator<Card>() {
+            public int compare(Card a, Card b) { return score.get(b) - score.get(a); }
+        });
+        // Exactly one login for this site with the same username: add the passkey to it straight away (setting).
+        int strong = 0;
+        for (Card c : candidates) if (score.get(c) >= 4) strong++;
+        if (strong == 1 && Prefs.p(this).getBoolean("pk_attach_auto", true)) {
+            final Card t = candidates.get(0);
+            verifyUser("Add passkey to “" + t.title + "”", new Runnable() {
+                public void run() { finishCreate(t, rpId, userName, displayName, userId, origin, clientDataHash); }
+            });
+            return;
+        }
+        final String[] items = new String[candidates.size() + 2];
+        for (int i = 0; i < candidates.size(); i++) items[i] = "Add to “" + candidates.get(i).title + "”" + (candidates.get(i).login().length() > 0 ? " (" + candidates.get(i).login() + ")" : "");
+        items[candidates.size()] = "Add to another login…";
+        items[candidates.size() + 1] = "New card “" + rpId + "”";
         String from = origin[0].toString().startsWith("android:") ? callerName(request.getCallingAppInfo()) : origin[0].toString();
-        Ui.dialog(this, "Create a passkey for " + rpId + "?\n" + (userName.length() > 0 ? userName + " · " : "") + "requested by " + from)
+        Ui.dialog(this, "Save passkey for " + rpId + (userName.length() > 0 ? " (" + userName + ")" : "") + " · requested by " + from)
                 .setItems(items, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, final int w) {
+                        if (w == candidates.size()) { pickAnyLogin(rpId, userName, displayName, userId, origin, clientDataHash); return; }
+                        final Card t = w < candidates.size() ? candidates.get(w) : null;
                         verifyUser("Create passkey for " + rpId, new Runnable() {
-                            public void run() {
-                                finishCreate(w == 0 ? null : candidates.get(w - 1), rpId, userName, displayName, userId, origin, clientDataHash);
-                            }
+                            public void run() { finishCreate(t, rpId, userName, displayName, userId, origin, clientDataHash); }
                         });
                     }
                 })
@@ -231,6 +251,29 @@ public class PasskeyActivity extends Activity {
                 .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int w) { cancel(); }
                 }).show();
+    }
+
+    /** Lets the user put the passkey on any existing login (e.g. one saved under a different website). */
+    private void pickAnyLogin(final String rpId, final String userName, final String displayName, final String userId, final Object[] origin, final byte[] clientDataHash) {
+        final List<Card> all = new ArrayList<Card>();
+        for (Card c : Session.vault().activeCards()) if (!c.template && (c.login().length() > 0 || c.password().length() > 0)) all.add(c);
+        java.util.Collections.sort(all, new java.util.Comparator<Card>() {
+            public int compare(Card a, Card b) { return a.title.compareToIgnoreCase(b.title); }
+        });
+        String[] names = new String[all.size()];
+        for (int i = 0; i < all.size(); i++) names[i] = all.get(i).title + (all.get(i).login().length() > 0 ? " (" + all.get(i).login() + ")" : "");
+        Ui.choose(this, "Add passkey to", names, new Ui.Cb<Integer>() {
+            public void on(Integer k) {
+                final Card t = all.get(k);
+                verifyUser("Add passkey to “" + t.title + "”", new Runnable() {
+                    public void run() {
+                        if (t.first(Field.WEBSITE) == null || !Card.baseDomain(Card.domainOf(t.website())).equalsIgnoreCase(Card.baseDomain(rpId)))
+                            t.fields.add(new Field("Website", Field.WEBSITE, "https://" + rpId)); // so the passkey's site also matches this card
+                        finishCreate(t, rpId, userName, displayName, userId, origin, clientDataHash);
+                    }
+                });
+            }
+        });
     }
 
     private void finishCreate(Card target, String rpId, String userName, String displayName, String userId, Object[] origin, byte[] clientDataHash) {
