@@ -25,8 +25,10 @@ An offline, open-source password manager for **Android and Windows**. It has the
 - Settings → Appearance → *Download website icons* (on by default).
 
 ### Everyday use
-- **List or grid**: tap ▦ / ☰ in the top bar to switch; the choice is remembered.
-- Search, filter chips, three sort orders and favourites at the top.
+- **Home screen built for speed:** an always-visible search bar; tabs for All, Favourites, Logins, Cards, Notes, Passkeys and Codes; a **Recent** row of the logins you use most; one A–Z list with letter headers and a letter scrubber on the right edge.
+- **Swipe a row** right to copy the password, left to copy the username (on Codes: the 2FA code). Long-press for copy, 2FA code, open website, favourite, duplicate or delete.
+- **Codes tab:** all your 2FA codes live, with countdown rings; tap to copy.
+- **Security check card:** appears only when something needs attention (weak · reused · expiring); tap to fix.
 - **Tap any value to copy it.** Copies are marked as sensitive and the clipboard clears automatically (15 s to 2 min, or never).
 - **Live 2FA codes (TOTP)** with a countdown. Works with `otpauth://` links, plain base32 keys and Steam Guard.
 - Password reveal, a large-text view, and one-tap open for websites, phone numbers and email addresses.

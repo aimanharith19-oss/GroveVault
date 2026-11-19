@@ -10,6 +10,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.EditText;
@@ -42,7 +43,6 @@ public class MainActivity extends BaseActivity {
     private Map<String, List<Card>> reused;
     private Adapter adapter;
     private Ui.PivotHeader chips;
-    private final Ui.Swiper swiper = new Ui.Swiper();
     private TextView empty;
     private EditText search;
 
@@ -65,111 +65,155 @@ public class MainActivity extends BaseActivity {
         maybeWarnExpiring();
     }
 
+    // ================================================================ home screen
+    // Search bar · collection tabs (All, Favourites, Logins, Cards, Notes, Passkeys, Codes) · security card ·
+    // Recent row · one A–Z list with a letter scrubber. Swipe a row right to copy the password, left to copy the
+    // username (or the 2FA code); long-press for more.
+
+    private static final String[] KINDS = {"all", "fav", "logins", "cards", "notes", "passkeys", "codes"};
+    private static final String[] KIND_NAMES = {"All", "Favourites", "Logins", "Cards", "Notes", "Passkeys", "Codes"};
+
+    private ListView list;
+    private LinearLayout recentBox, recentRow, securityBox;
+    private LinearLayout scrubber;
+    private final List<Object> rows = new ArrayList<Object>(); // String = letter header, Card = card
+    private final android.os.Handler ticker = new android.os.Handler();
+    private final Runnable tick = new Runnable() {
+        public void run() {
+            if (filter.equals("codes") && adapter != null) {
+                adapter.notifyDataSetChanged();
+                ticker.postDelayed(this, 1000);
+            }
+        }
+    };
+
+    static String kind(Card c) {
+        if (c.first(Field.OTP) != null && c.password().length() == 0 && c.login().length() == 0) return "codes";
+        if ("card".equals(c.icon) || "bank".equals(c.icon) || "id".equals(c.icon) || "car".equals(c.icon) || "shield".equals(c.icon)) return "cards";
+        if (c.login().length() > 0 || c.password().length() > 0 || !c.passkeys().isEmpty()) return "logins";
+        return "notes";
+    }
+
+    static boolean inKind(Card c, String k) {
+        if (k.equals("passkeys")) return !c.passkeys().isEmpty();
+        if (k.equals("codes")) return c.first(Field.OTP) != null;
+        if (k.equals("logins")) return kind(c).equals("logins");
+        return kind(c).equals(k);
+    }
+
     private void build() {
         LinearLayout root = Ui.screen(this);
-        final TextView searchBtn = Ui.iconButton(this, "🔍", null);
-        TextView menuBtn = Ui.iconButton(this, "…", null);
+        TextView menuBtn = Ui.iconButton(this, "…", new View.OnClickListener() {
+            public void onClick(View v) { showMenu(v); }
+        });
         TextView addBtn = Ui.iconButton(this, "+", new View.OnClickListener() {
             public void onClick(View v) { addCard(); }
         });
-        final TextView viewBtn = Ui.iconButton(this, Prefs.p(this).getBoolean("grid", false) ? "☰" : "▦", null);
-        viewBtn.setContentDescription("Switch between list and grid");
-        viewBtn.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                boolean g = !Prefs.p(MainActivity.this).getBoolean("grid", false);
-                Prefs.put(MainActivity.this, "grid", g);
-                viewBtn.setText(g ? "☰" : "▦");
-                showCards();
-            }
-        });
-        LinearLayout bar = Ui.topBar(this, "GroveVault", false, addBtn, searchBtn, viewBtn, menuBtn);
-        header = bar;
-        root.addView(bar);
-        search = Ui.edit(this, "Search cards", InputType.TYPE_CLASS_TEXT);
-        search.setVisibility(View.GONE);
-        root.addView(search, Ui.margins(this, Ui.MATCH, Ui.WRAP, 16, 0, 16, 8));
+        header = Ui.topBar(this, "GroveVault", false, addBtn, menuBtn);
+        root.addView(header);
+
+        // always-visible search box with a search icon
+        search = Ui.edit(this, "Search your vault", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        android.graphics.drawable.Drawable ic = getDrawable(R.drawable.ic_search).mutate();
+        ic.setTint(Ui.SUB);
+        ic.setBounds(0, 0, Ui.dp(this, 18), Ui.dp(this, 18));
+        search.setCompoundDrawablesRelative(ic, null, null, null);
+        search.setCompoundDrawablePadding(Ui.dp(this, 8));
+        search.setSingleLine(true);
+        search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH | android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
+        root.addView(search, Ui.margins(this, Ui.MATCH, Ui.WRAP, 16, 0, 16, 4));
         search.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
             public void onTextChanged(CharSequence s, int a, int b, int c) {}
             public void afterTextChanged(Editable s) {
                 query = s.toString().trim();
+                searching = query.length() > 0;
                 refresh();
             }
         });
-        searchBtn.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                searching = !searching;
-                search.setVisibility(searching ? View.VISIBLE : View.GONE);
-                if (searching) Ui.showKeyboard(search);
-                else {
-                    search.setText("");
-                    Ui.hideKeyboard(search);
-                }
-            }
-        });
-        menuBtn.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                showMenu(v);
-            }
-        });
+
         chips = new Ui.PivotHeader(this);
         root.addView(chips, Ui.lp(Ui.MATCH, Ui.WRAP));
 
         frame = new FrameLayout(this);
         root.addView(frame, Ui.lp(Ui.MATCH, 0));
         ((LinearLayout.LayoutParams) frame.getLayoutParams()).weight = 1;
+
+        list = new ListView(this);
+        list.setDivider(null);
+        list.setSelector(new android.graphics.drawable.ColorDrawable(0));
+        list.setClipToPadding(false);
+        list.setPadding(0, Ui.dp(this, 4), Ui.dp(this, 18), Ui.dp(this, 16));
+        list.setVerticalScrollBarEnabled(false);
+
+        // header: security card + recent row
+        securityBox = Ui.vertical(this);
+        list.addHeaderView(securityBox, null, false);
+        recentBox = Ui.vertical(this);
+        recentBox.addView(sectionLabel("Recent"));
+        recentRow = Ui.horizontal(this);
+        recentRow.setPadding(Ui.dp(this, 12), 0, Ui.dp(this, 12), Ui.dp(this, 4));
+        android.widget.HorizontalScrollView hs = Ui.hscroll(this, recentRow);
+        recentBox.addView(hs);
+        list.addHeaderView(recentBox, null, false);
+
         adapter = new Adapter();
-        showCards();
+        list.setAdapter(adapter);
+        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            public void onItemClick(AdapterView<?> p, View view, int pos, long id) {
+                Object o = p.getItemAtPosition(pos);
+                if (o instanceof Card) {
+                    Card c = (Card) o;
+                    if (filter.equals("codes")) copyCode(c);
+                    else open(c);
+                }
+            }
+        });
+        list.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+            public boolean onItemLongClick(AdapterView<?> p, View view, int pos, long id) {
+                Object o = p.getItemAtPosition(pos);
+                if (o instanceof Card) quickActions((Card) o);
+                return o instanceof Card;
+            }
+        });
+        list.setOnTouchListener(new RowSwiper());
+        cardsView = list;
+        frame.addView(list, new FrameLayout.LayoutParams(Ui.MATCH, Ui.MATCH));
+
+        scrubber = Ui.vertical(this);
+        scrubber.setGravity(Gravity.CENTER_HORIZONTAL);
+        FrameLayout.LayoutParams sl = new FrameLayout.LayoutParams(Ui.dp(this, 22), Ui.MATCH, Gravity.END);
+        sl.setMargins(0, Ui.dp(this, 8), Ui.dp(this, 2), Ui.dp(this, 8));
+        frame.addView(scrubber, sl);
+        scrubber.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View v, android.view.MotionEvent e) {
+                int n = scrubber.getChildCount();
+                if (n == 0) return false;
+                int i = (int) (e.getY() / Math.max(1, scrubber.getHeight()) * n);
+                i = Math.max(0, Math.min(n - 1, i));
+                String letter = ((TextView) scrubber.getChildAt(i)).getText().toString();
+                int at = rows.indexOf(letter);
+                if (at >= 0) list.setSelectionFromTop(at + list.getHeaderViewsCount(), 0);
+                for (int k = 0; k < n; k++) ((TextView) scrubber.getChildAt(k)).setTextColor(k == i && e.getActionMasked() != android.view.MotionEvent.ACTION_UP ? Ui.ACCENT : Ui.SUB);
+                return true;
+            }
+        });
+
         empty = Ui.text(this, "", 15, Ui.SUB, false);
         empty.setGravity(Gravity.CENTER);
         empty.setPadding(Ui.dp(this, 40), 0, Ui.dp(this, 40), 0);
         frame.addView(empty, new FrameLayout.LayoutParams(Ui.MATCH, Ui.MATCH));
-        empty.setOnTouchListener(swipeListener());
-        empty.setClickable(true);
+    }
 
+    private TextView sectionLabel(String s) {
+        TextView t = Ui.text(this, s, 14, Ui.TEXT, true);
+        t.setPadding(Ui.dp(this, 20), Ui.dp(this, 12), Ui.dp(this, 20), Ui.dp(this, 6));
+        return t;
     }
 
     private View header;
-
     private FrameLayout frame;
     private android.widget.AbsListView cardsView;
-
-    /** Shows the cards as a list or as a grid of tiles (remembered). */
-    private void showCards() {
-        boolean grid = Prefs.p(this).getBoolean("grid", false);
-        if (cardsView != null) frame.removeView(cardsView);
-        android.widget.AbsListView v;
-        if (grid) {
-            android.widget.GridView g = new android.widget.GridView(this);
-            g.setNumColumns(android.widget.GridView.AUTO_FIT);
-            g.setColumnWidth(Ui.dp(this, 104));
-            g.setStretchMode(android.widget.GridView.STRETCH_COLUMN_WIDTH);
-            g.setVerticalSpacing(Ui.dp(this, 8));
-            g.setHorizontalSpacing(Ui.dp(this, 8));
-            g.setPadding(Ui.dp(this, 16), Ui.dp(this, 4), Ui.dp(this, 16), Ui.dp(this, 16));
-            v = g;
-        } else {
-            ListView l = new ListView(this);
-            l.setDivider(null);
-            l.setPadding(0, 0, 0, Ui.dp(this, 12));
-            v = l;
-        }
-        v.setClipToPadding(false);
-        v.setOnTouchListener(swipeListener());
-        v.setAdapter(adapter);
-        v.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            public void onItemClick(AdapterView<?> p, View view, int pos, long id) { open(shown.get(pos)); }
-        });
-        v.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-            public boolean onItemLongClick(AdapterView<?> p, View view, int pos, long id) {
-                quickActions(shown.get(pos));
-                return true;
-            }
-        });
-        cardsView = v;
-        frame.addView(v, 0);
-        adapter.notifyDataSetChanged();
-    }
 
     private void refresh() {
         Vault v = Session.vault();
@@ -179,136 +223,291 @@ public class MainActivity extends BaseActivity {
         reused = Audit.reused(active);
         long now = System.currentTimeMillis();
         int days = Prefs.expiryDays(this);
-        int weak = 0, re = 0, exp = 0, fav = 0;
+        int weak = 0, re = 0, exp = 0;
+        boolean[] has = new boolean[KINDS.length];
         for (Card c : active) {
+            if (c.template) continue;
             if (Audit.hasWeakPassword(c)) weak++;
             if (Audit.isReused(c, reused)) re++;
             if (Audit.isExpiring(c, days, now)) exp++;
-            if (c.favorite) fav++;
+            if (c.favorite) has[1] = true;
+            for (int k = 2; k < KINDS.length; k++) if (inKind(c, KINDS[k])) has[k] = true;
         }
+        // tabs: collections that have something, plus whatever extra filter is open (label, trash, audit…)
         pivotKeys.clear();
         pivotNames.clear();
-        addChip("all", "all");
-        if (fav > 0) addChip("favourites", "fav");
-        v.sortLabels();
-        for (Label l : v.labels) addChip(l.name, "label:" + l.id);
-        if (weak > 0) addChip("weak", "weak");
-        if (re > 0) addChip("reused", "reused");
-        if (exp > 0) addChip("expiring", "expiring");
-        int trash = v.trash().size();
-        if (trash > 0 || filter.equals("trash")) addChip("trash", "trash");
-        if (filter.equals("templates")) addChip("templates", "templates");
-
+        for (int k = 0; k < KINDS.length; k++) if (k == 0 || has[k] || filter.equals(KINDS[k])) addChip(KIND_NAMES[k], KINDS[k]);
+        if (filter.startsWith("label:")) addChip(v.findLabel(filter.substring(6)).name, filter);
+        if (filter.equals("weak")) addChip("Weak", "weak");
+        if (filter.equals("reused")) addChip("Reused", "reused");
+        if (filter.equals("expiring")) addChip("Expiring", "expiring");
+        if (filter.equals("trash")) addChip("Trash", "trash");
+        if (filter.equals("templates")) addChip("Templates", "templates");
         int sel = Math.max(0, pivotKeys.indexOf(filter));
         if (!pivotKeys.equals(lastKeys) || sel != chipsSel) {
-            lastKeys = new java.util.ArrayList<String>(pivotKeys);
+            lastKeys = new ArrayList<String>(pivotKeys);
             chipsSel = sel;
             chips.set(pivotNames.toArray(new String[0]), sel, new Ui.Cb<Integer>() {
-                public void on(Integer k) { goTo(k); }
+                public void on(Integer k) {
+                    filter = pivotKeys.get(k);
+                    chipsSel = k;
+                    chips.animateTo(k);
+                    refresh();
+                    list.setSelection(0);
+                }
             });
         }
-        swiper.pages = pivotKeys.size();
-        swiper.page = sel;
 
+        // security card (only on All, only when something needs attention)
+        securityBox.removeAllViews();
+        if (filter.equals("all") && !searching && Prefs.showWarnings(this) && weak + re + exp > 0) {
+            final int fw = weak, fr = re, fe = exp;
+            String txt = "";
+            if (weak > 0) txt += weak + " weak";
+            if (re > 0) txt += (txt.length() > 0 ? " · " : "") + re + " reused";
+            if (exp > 0) txt += (txt.length() > 0 ? " · " : "") + exp + " expiring";
+            LinearLayout card = Ui.row(this, "⚠  Security check", txt + ". Tap to fix", new View.OnClickListener() {
+                public void onClick(View x) {
+                    final List<String> keys = new ArrayList<String>();
+                    List<String> names = new ArrayList<String>();
+                    if (fw > 0) { keys.add("weak"); names.add("Weak passwords (" + fw + ")"); }
+                    if (fr > 0) { keys.add("reused"); names.add("Reused passwords (" + fr + ")"); }
+                    if (fe > 0) { keys.add("expiring"); names.add("Expiring (" + fe + ")"); }
+                    Ui.choose(MainActivity.this, "Security check", names.toArray(new String[0]), new Ui.Cb<Integer>() {
+                        public void on(Integer i) { filter = keys.get(i); refresh(); list.setSelection(0); }
+                    });
+                }
+            });
+            ((LinearLayout.LayoutParams) card.getLayoutParams()).setMargins(Ui.dp(this, 16), Ui.dp(this, 4), Ui.dp(this, 16), Ui.dp(this, 4));
+            securityBox.addView(card);
+        }
+
+        // recent row
+        recentRow.removeAllViews();
+        if (filter.equals("all") && !searching) {
+            for (String id : Usage.top(this, 10)) {
+                final Card c = Session.card(id);
+                if (c == null || c.deleted || c.template) continue;
+                LinearLayout chip = Ui.vertical(this);
+                chip.setGravity(Gravity.CENTER_HORIZONTAL);
+                chip.setPadding(Ui.dp(this, 6), Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 8));
+                chip.addView(Ui.cardIcon(this, c, 44));
+                TextView t = Ui.text(this, c.title, 12, Ui.TEXT, false);
+                t.setSingleLine(true);
+                t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                t.setGravity(Gravity.CENTER);
+                t.setPadding(0, Ui.dp(this, 4), 0, 0);
+                chip.addView(t, Ui.lp(Ui.dp(this, 64), Ui.WRAP));
+                chip.setBackground(Ui.pressable(this, null, Ui.dp(this, Ui.R_CARD)));
+                chip.setClickable(true);
+                chip.setOnClickListener(new View.OnClickListener() {
+                    public void onClick(View x) { open(c); }
+                });
+                chip.setOnLongClickListener(new View.OnLongClickListener() {
+                    public boolean onLongClick(View x) { quickActions(c); return true; }
+                });
+                recentRow.addView(chip);
+            }
+        }
+        recentBox.setVisibility(recentRow.getChildCount() > 1 ? View.VISIBLE : View.GONE);
+        if (recentBox.getVisibility() == View.GONE) recentBox.setLayoutParams(new AbsListView.LayoutParams(Ui.MATCH, 1));
+        else recentBox.setLayoutParams(new AbsListView.LayoutParams(Ui.MATCH, Ui.WRAP));
+
+        // the list
         shown.clear();
         List<Card> source = filter.equals("trash") ? v.trash() : filter.equals("templates") ? v.templates() : active;
         for (Card c : source) {
             if (!c.matches(query)) continue;
+            if (!filter.equals("templates") && c.template) continue;
             if (filter.equals("fav") && !c.favorite) continue;
             if (filter.startsWith("label:") && !c.labelIds.contains(filter.substring(6))) continue;
             if (filter.equals("weak") && !Audit.hasWeakPassword(c)) continue;
             if (filter.equals("reused") && !Audit.isReused(c, reused)) continue;
             if (filter.equals("expiring") && !Audit.isExpiring(c, days, now)) continue;
+            if ((filter.equals("logins") || filter.equals("cards") || filter.equals("notes") || filter.equals("passkeys") || filter.equals("codes")) && !inKind(c, filter)) continue;
             shown.add(c);
         }
         final int sort = Prefs.sort(this);
-        final boolean favTop = Prefs.favoritesOnTop(this) && !filter.equals("templates");
         Collections.sort(shown, new Comparator<Card>() {
             public int compare(Card a, Card b) {
-                if (favTop && a.favorite != b.favorite) return a.favorite ? -1 : 1;
                 if (sort == 1) return Long.compare(b.modified, a.modified);
                 if (sort == 2) return Long.compare(b.created, a.created);
                 return a.title.compareToIgnoreCase(b.title);
             }
         });
+        // A–Z sections (alphabetical order only)
+        rows.clear();
+        scrubber.removeAllViews();
+        boolean az = sort == 0 && shown.size() > 8;
+        String last = null;
+        for (Card c : shown) {
+            if (az) {
+                String l = letterOf(c.title);
+                if (!l.equals(last)) {
+                    rows.add(l);
+                    last = l;
+                    TextView s = Ui.text(this, l, 11, Ui.SUB, true);
+                    s.setGravity(Gravity.CENTER);
+                    scrubber.addView(s, new LinearLayout.LayoutParams(Ui.MATCH, 0, 1));
+                }
+            }
+            rows.add(c);
+        }
+        scrubber.setVisibility(az && shown.size() > 20 && scrubber.getChildCount() > 3 ? View.VISIBLE : View.GONE);
         adapter.notifyDataSetChanged();
-        if (shown.isEmpty()) {
-            if (query.length() > 0) empty.setText("No cards match “" + query + "”.");
-            else if (filter.equals("all")) empty.setText("Your vault is empty.\n\nTap + to add a password, card or note, or import from KeePass or another app in ⋮ → Backup & import.");
+        ticker.removeCallbacks(tick);
+        if (filter.equals("codes")) ticker.postDelayed(tick, 1000);
+
+        if (shown.isEmpty() && securityBox.getChildCount() == 0 && recentRow.getChildCount() == 0) {
+            if (query.length() > 0) empty.setText("Nothing matches “" + query + "”.");
+            else if (filter.equals("all")) empty.setText("Your vault is empty.\n\nTap + to add a password, card or note, or import from another app in … → Backup & import.");
             else if (filter.equals("trash")) empty.setText("Trash is empty.");
             else empty.setText("Nothing here.");
             empty.setVisibility(View.VISIBLE);
         } else empty.setVisibility(View.GONE);
     }
 
-    private final java.util.List<String> pivotKeys = new java.util.ArrayList<String>();
-    private final java.util.List<String> pivotNames = new java.util.ArrayList<String>();
-    private java.util.List<String> lastKeys;
+    static String letterOf(String title) {
+        String t = title == null ? "" : title.trim();
+        if (t.length() == 0) return "#";
+        char ch = Character.toUpperCase(t.charAt(0));
+        return Character.isLetter(ch) && ch < 128 ? String.valueOf(ch) : "#";
+    }
+
+    private final List<String> pivotKeys = new ArrayList<String>();
+    private final List<String> pivotNames = new ArrayList<String>();
+    private List<String> lastKeys;
     private int chipsSel = -1;
-
-    /**
-     * Panorama parallax spread over however many tabs there are: across all of them the title slides by half its
-     * width (or by what doesn't fit on screen, if more), like the Windows Phone panorama.
-     */
-    private void parallax(float pos) {}
-
-    /** Tapping a pivot header: slide the list across and move the headers. */
-    private void goTo(final int k) {
-        int cur = pivotKeys.indexOf(filter);
-        if (k == cur || k < 0 || k >= pivotKeys.size() || cardsView == null) return;
-        cardsView.animate().cancel();
-        final int dir = k > cur ? 1 : -1;
-        cardsView.animate().translationX(-dir * frame.getWidth()).setDuration(140).setInterpolator(new android.view.animation.AccelerateInterpolator())
-                .withEndAction(new Runnable() {
-                    public void run() {
-                        applyPage(k);
-                        cardsView.setTranslationX(dir * frame.getWidth() * 0.5f);
-                        cardsView.animate().translationX(0).setDuration(320).setInterpolator(new android.view.animation.DecelerateInterpolator(2.5f)).start();
-                    }
-                }).start();
-    }
-
-    private void applyPage(int k) {
-        filter = pivotKeys.get(k);
-        chipsSel = k;
-        chips.animateTo(k);
-        refresh();
-        cardsView.setSelection(0);
-    }
-
-    private android.view.View.OnTouchListener swipeListener() {
-        swiper.onDrag = new Ui.Cb<Float>() {
-            public void on(Float f) {
-                chips.drag(f);
-                parallax(Math.max(0, pivotKeys.indexOf(filter) + f));
-            }
-        };
-        swiper.onPage = new Ui.Cb<Integer>() {
-            public void on(Integer dir) { applyPage(pivotKeys.indexOf(filter) + dir); }
-        };
-        return new android.view.View.OnTouchListener() {
-            public boolean onTouch(View v, android.view.MotionEvent e) {
-                swiper.content = cardsView;
-                if (swiper.handle(e)) {
-                    if (swiper.justStarted) {
-                        android.view.MotionEvent c = android.view.MotionEvent.obtain(e);
-                        c.setAction(android.view.MotionEvent.ACTION_CANCEL); // don't also scroll or open a card
-                        v.onTouchEvent(c);
-                        c.recycle();
-                    }
-                    return true;
-                }
-                return false;
-            }
-        };
-    }
 
     private void addChip(String label, final String key) {
         pivotKeys.add(key);
         pivotNames.add(label);
     }
 
+    // ---------------------------------------------------------------- quick copy
+
+    private void copyPassword(Card c) {
+        if (c.password().length() == 0) { Ui.toast(this, "No password on this card"); return; }
+        App.copy(this, "Password", c.password());
+        Usage.record(this, c.id);
+        Ui.toast(this, "Password copied");
+    }
+
+    private void copyUser(Card c) {
+        if (c.login().length() == 0) { Ui.toast(this, "No username on this card"); return; }
+        App.copy(this, "Login", c.login());
+        Usage.record(this, c.id);
+        Ui.toast(this, "Username copied");
+    }
+
+    private void copyCode(Card c) {
+        Field f = c.first(Field.OTP);
+        Totp t = f == null ? null : Totp.parse(f.value);
+        if (t == null) { Ui.toast(this, "No 2FA code on this card"); return; }
+        App.copy(this, "One-time code", t.code(System.currentTimeMillis()));
+        Usage.record(this, c.id);
+        Ui.toast(this, "Code copied");
+    }
+
+    /** Swipe a row: right → copy password, left → copy username (2FA code on the Codes tab). */
+    private class RowSwiper implements View.OnTouchListener {
+        float x0, y0;
+        boolean decided, dragging;
+        View front, back;
+        TextView backLabel;
+        Card card;
+
+        public boolean onTouch(View v, android.view.MotionEvent e) {
+            switch (e.getActionMasked()) {
+                case android.view.MotionEvent.ACTION_DOWN: {
+                    x0 = e.getX();
+                    y0 = e.getY();
+                    decided = dragging = false;
+                    front = back = null;
+                    card = null;
+                    int pos = list.pointToPosition((int) x0, (int) y0);
+                    if (pos == AdapterView.INVALID_POSITION) return false;
+                    Object o = list.getItemAtPosition(pos);
+                    View row = list.getChildAt(pos - list.getFirstVisiblePosition());
+                    if (!(o instanceof Card) || row == null || filter.equals("trash") || ((Card) o).template) return false;
+                    card = (Card) o;
+                    front = row.findViewWithTag("front");
+                    back = row.findViewWithTag("back");
+                    backLabel = back == null ? null : (TextView) back.findViewWithTag("backLabel");
+                    return false;
+                }
+                case android.view.MotionEvent.ACTION_MOVE: {
+                    if (front == null) return false;
+                    float dx = e.getX() - x0, dy = e.getY() - y0;
+                    int slop = android.view.ViewConfiguration.get(MainActivity.this).getScaledTouchSlop();
+                    if (!decided && (Math.abs(dx) > slop || Math.abs(dy) > slop)) {
+                        decided = true;
+                        dragging = Math.abs(dx) > Math.abs(dy) * 1.3f;
+                        if (dragging) {
+                            android.view.MotionEvent c = android.view.MotionEvent.obtain(e);
+                            c.setAction(android.view.MotionEvent.ACTION_CANCEL); // stop the list scrolling / pressing
+                            list.onTouchEvent(c);
+                            c.recycle();
+                        }
+                    }
+                    if (!dragging) return false;
+                    float w = front.getWidth(), lim = w * 0.45f;
+                    float t = Math.max(-lim, Math.min(lim, dx));
+                    front.setTranslationX(t);
+                    boolean right = t > 0, armed = Math.abs(t) > w * 0.22f;
+                    back.setBackgroundColor(armed ? (right ? Ui.ACCENT : 0xFF2B79D0) : (Ui.dark ? 0xFF3A3A3A : 0xFFE0E0E0));
+                    backLabel.setText(right ? "Copy password" : filter.equals("codes") ? "Copy code" : "Copy username");
+                    backLabel.setTextColor(armed ? 0xFFFFFFFF : Ui.SUB);
+                    ((FrameLayout.LayoutParams) backLabel.getLayoutParams()).gravity = Gravity.CENTER_VERTICAL | (right ? Gravity.START : Gravity.END);
+                    backLabel.requestLayout();
+                    back.setVisibility(View.VISIBLE);
+                    return true;
+                }
+                case android.view.MotionEvent.ACTION_UP:
+                case android.view.MotionEvent.ACTION_CANCEL: {
+                    if (!dragging || front == null) return false;
+                    dragging = false;
+                    float t = front.getTranslationX();
+                    if (e.getActionMasked() == android.view.MotionEvent.ACTION_UP && Math.abs(t) > front.getWidth() * 0.22f) {
+                        if (t > 0) copyPassword(card);
+                        else if (filter.equals("codes")) copyCode(card);
+                        else copyUser(card);
+                    }
+                    final View b = back;
+                    front.animate().translationX(0).setDuration(220).setInterpolator(new android.view.animation.DecelerateInterpolator(2f))
+                            .withEndAction(new Runnable() {
+                                public void run() { if (b != null) b.setVisibility(View.INVISIBLE); }
+                            }).start();
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    /** Small countdown ring for 2FA codes. */
+    private static class Ring extends View {
+        float frac;
+        final android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+
+        Ring(android.content.Context c) { super(c); }
+
+        @Override
+        protected void onDraw(android.graphics.Canvas cv) {
+            float s = Math.min(getWidth(), getHeight()), sw = s * 0.14f;
+            p.setStyle(android.graphics.Paint.Style.STROKE);
+            p.setStrokeWidth(sw);
+            p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+            android.graphics.RectF r = new android.graphics.RectF(sw, sw, s - sw, s - sw);
+            p.setColor(Ui.DIVIDER | 0x20000000);
+            cv.drawArc(r, 0, 360, false, p);
+            p.setColor(frac < 0.2f ? Ui.DANGER : Ui.ACCENT);
+            cv.drawArc(r, -90, 360 * frac, false, p);
+        }
+    }
+
     private void open(Card c) {
+        if (!c.template) Usage.record(this, c.id);
         if (c.template) {
             startActivity(new Intent(this, EditActivity.class).putExtra("id", c.id));
         } else {
@@ -424,6 +623,7 @@ public class MainActivity extends BaseActivity {
         final java.util.List<Integer> ids = new java.util.ArrayList<Integer>();
         final java.util.List<String> names = new java.util.ArrayList<String>();
         ids.add(1); names.add("Password generator");
+        if (!Session.vault().labels.isEmpty()) { ids.add(11); names.add("Show a label…"); }
         ids.add(2); names.add("Labels");
         ids.add(3); names.add(filter.equals("templates") ? "Back to cards" : "Templates");
         if (filter.equals("templates")) { ids.add(9); names.add("Restore default templates"); }
@@ -449,6 +649,16 @@ public class MainActivity extends BaseActivity {
                     case 7: startActivity(new Intent(MainActivity.this, SettingsActivity.class)); break;
                     case 8: Session.lock(); startActivity(new Intent(MainActivity.this, LockActivity.class)); finish(); break;
                     case 10: combineDuplicates(); break;
+                    case 11: {
+                        final Vault vv = Session.vault();
+                        vv.sortLabels();
+                        String[] ln = new String[vv.labels.size()];
+                        for (int i = 0; i < ln.length; i++) ln[i] = vv.labels.get(i).name;
+                        Ui.choose(MainActivity.this, "Show label", ln, new Ui.Cb<Integer>() {
+                            public void on(Integer i) { filter = "label:" + vv.labels.get(i).id; refresh(); list.setSelection(0); }
+                        });
+                        break;
+                    }
                     case 9:
                         Ui.confirm(MainActivity.this, "Restore default templates?", "Missing built-in templates will be added back. Your own templates are kept.", "Restore", new Runnable() {
                             public void run() {
@@ -482,60 +692,56 @@ public class MainActivity extends BaseActivity {
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        ticker.removeCallbacks(tick);
+    }
+
+    @Override
     public void onBackPressed() {
         if (searching) {
-            searching = false;
             search.setText("");
-            search.setVisibility(View.GONE);
+            Ui.hideKeyboard(search);
         } else if (!filter.equals("all")) {
             filter = "all";
             refresh();
         } else super.onBackPressed();
     }
 
-    /** Live tile: square in the card's colour, icon in the middle, name in the bottom-left corner. */
-    private View tile(Card c) {
-        FrameLayout f = new FrameLayout(this) {
-            @Override
-            protected void onMeasure(int w, int h) { super.onMeasure(w, w); }
-        };
-        // Fluent card: rounded layer with a hairline border, icon in the middle, name underneath
-        f.setBackground(Ui.card(this));
-        View icon = Ui.cardIcon(this, c, 60);
-        FrameLayout.LayoutParams il = new FrameLayout.LayoutParams(Ui.WRAP, Ui.WRAP, Gravity.CENTER);
-        il.bottomMargin = Ui.dp(this, 14);
-        f.addView(icon, il);
-        TextView title = Ui.text(this, c.title.length() == 0 ? "(untitled)" : c.title, 13, Ui.TEXT, false);
-        title.setSingleLine(true);
-        title.setGravity(Gravity.CENTER);
-        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        FrameLayout.LayoutParams tl = new FrameLayout.LayoutParams(Ui.MATCH, Ui.WRAP, Gravity.BOTTOM);
-        tl.setMargins(Ui.dp(this, 8), 0, Ui.dp(this, 8), Ui.dp(this, 10));
-        f.addView(title, tl);
-        String badges = "";
-        if (!c.template && Prefs.showWarnings(this) && (Audit.isExpired(c, System.currentTimeMillis()) || Audit.hasWeakPassword(c) || Audit.isReused(c, reused))) badges += "⚠";
-        for (Field pf : c.fields) if (Field.PASSKEY.equals(pf.type)) { badges += "🔐"; break; }
-        if (c.favorite) badges += "★";
-        if (badges.length() > 0) {
-            TextView b = Ui.text(this, badges, 12, Ui.WARN, false);
-            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(Ui.WRAP, Ui.WRAP, Gravity.TOP | Gravity.END);
-            lp.setMargins(0, Ui.dp(this, 5), Ui.dp(this, 7), 0);
-            f.addView(b, lp);
-        }
-        Ui.tilt(f);
-        return f;
-    }
-
     private class Adapter extends BaseAdapter {
-        public int getCount() { return shown.size(); }
-        public Object getItem(int i) { return shown.get(i); }
+        public int getCount() { return rows.size(); }
+        public Object getItem(int i) { return rows.get(i); }
         public long getItemId(int i) { return i; }
+        public int getViewTypeCount() { return 2; }
+        public int getItemViewType(int i) { return rows.get(i) instanceof String ? 0 : 1; }
+        public boolean isEnabled(int i) { return rows.get(i) instanceof Card; }
+        public boolean areAllItemsEnabled() { return false; }
 
         public View getView(int pos, View convert, ViewGroup parent) {
-            Card c = shown.get(pos);
-            if (Prefs.p(MainActivity.this).getBoolean("grid", false)) return tile(c);
+            Object o = rows.get(pos);
+            if (o instanceof String) {
+                TextView t = Ui.text(MainActivity.this, (String) o, 13, Ui.ACCENT, true);
+                t.setPadding(Ui.dp(MainActivity.this, 20), Ui.dp(MainActivity.this, 12), Ui.dp(MainActivity.this, 20), Ui.dp(MainActivity.this, 2));
+                return t;
+            }
+            Card c = (Card) o;
+            boolean codes = filter.equals("codes");
+
+            FrameLayout cell = new FrameLayout(MainActivity.this);
+            // revealed behind the row while swiping
+            FrameLayout back = new FrameLayout(MainActivity.this);
+            back.setTag("back");
+            back.setVisibility(View.INVISIBLE);
+            TextView bl = Ui.text(MainActivity.this, "", 14, 0xFFFFFFFF, true);
+            bl.setTag("backLabel");
+            bl.setPadding(Ui.dp(MainActivity.this, 20), 0, Ui.dp(MainActivity.this, 20), 0);
+            back.addView(bl, new FrameLayout.LayoutParams(Ui.WRAP, Ui.WRAP, Gravity.CENTER_VERTICAL | Gravity.START));
+            cell.addView(back, new FrameLayout.LayoutParams(Ui.MATCH, Ui.MATCH));
+
             LinearLayout r = Ui.horizontal(MainActivity.this);
-            r.setPadding(Ui.dp(MainActivity.this, 20), Ui.dp(MainActivity.this, 8), Ui.dp(MainActivity.this, 16), Ui.dp(MainActivity.this, 8));
+            r.setTag("front");
+            r.setBackgroundColor(Ui.BG);
+            r.setPadding(Ui.dp(MainActivity.this, 20), Ui.dp(MainActivity.this, 8), Ui.dp(MainActivity.this, 12), Ui.dp(MainActivity.this, 8));
             r.setGravity(Gravity.CENTER_VERTICAL);
             r.setMinimumHeight(Ui.dp(MainActivity.this, 60));
             r.addView(Ui.cardIcon(MainActivity.this, c, 36));
@@ -553,15 +759,34 @@ public class MainActivity extends BaseActivity {
                 tx.addView(s);
             }
             r.addView(tx, Ui.lpw(1));
-            if (!c.template && Prefs.showWarnings(MainActivity.this)) {
-                String w = "";
-                if (Audit.isExpired(c, System.currentTimeMillis())) w += "⏰";
-                if (Audit.hasWeakPassword(c) || Audit.isReused(c, reused)) w += "⚠";
-                if (w.length() > 0) r.addView(Ui.text(MainActivity.this, w, 14, Ui.WARN, false));
+            if (codes) {
+                Field f = c.first(Field.OTP);
+                Totp tp = f == null ? null : Totp.parse(f.value);
+                if (tp != null) {
+                    long now = System.currentTimeMillis();
+                    String code = tp.code(now);
+                    if (code.length() == 6) code = code.substring(0, 3) + " " + code.substring(3);
+                    TextView ct = Ui.text(MainActivity.this, code, 22, Ui.ACCENT, true);
+                    ct.setTypeface(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD);
+                    r.addView(ct);
+                    Ring ring = new Ring(MainActivity.this);
+                    ring.frac = tp.secondsLeft(now) / (float) tp.period;
+                    LinearLayout.LayoutParams rl = Ui.lp(Ui.dp(MainActivity.this, 22), Ui.dp(MainActivity.this, 22));
+                    rl.setMargins(Ui.dp(MainActivity.this, 10), 0, 0, 0);
+                    r.addView(ring, rl);
+                }
+            } else {
+                if (!c.template && Prefs.showWarnings(MainActivity.this)) {
+                    String w = "";
+                    if (Audit.isExpired(c, System.currentTimeMillis())) w += "⏰";
+                    if (Audit.hasWeakPassword(c) || Audit.isReused(c, reused)) w += "⚠";
+                    if (w.length() > 0) r.addView(Ui.text(MainActivity.this, w, 14, Ui.WARN, false));
+                }
+                if (!c.passkeys().isEmpty()) r.addView(Ui.text(MainActivity.this, " 🔐", 14, Ui.SUB, false));
+                if (c.favorite) r.addView(Ui.text(MainActivity.this, " ★", 16, Ui.WARN, false));
             }
-            for (Field pf : c.fields) if (Field.PASSKEY.equals(pf.type)) { r.addView(Ui.text(MainActivity.this, " 🔐", 14, Ui.SUB, false)); break; }
-            if (c.favorite) r.addView(Ui.text(MainActivity.this, " ★", 16, Ui.WARN, false));
-            return r;
+            cell.addView(r, new FrameLayout.LayoutParams(Ui.MATCH, Ui.WRAP));
+            return cell;
         }
     }
 

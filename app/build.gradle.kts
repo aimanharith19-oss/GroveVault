@@ -10,8 +10,8 @@ android {
         applicationId = "org.grove.vault"
         minSdk = 26
         targetSdk = 34
-        versionCode = 26
-        versionName = "1.11.0"
+        versionCode = 27
+        versionName = "1.12.0"
     }
 
     buildTypes {

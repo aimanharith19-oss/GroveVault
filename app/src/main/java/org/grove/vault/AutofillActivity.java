@@ -75,6 +75,7 @@ public class AutofillActivity extends Activity {
                 finish();
                 return;
             }
+            Usage.record(this, c.id);
             deliver(c, false);
         } else showPicker();
     }
