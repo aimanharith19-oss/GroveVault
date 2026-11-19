@@ -20,6 +20,48 @@ import javax.crypto.Cipher;
 
 /** Security, autofill, appearance and data settings. */
 public class SettingsActivity extends BaseActivity {
+    private static final int REQ_SAVE_CRX = 7311;
+
+    @Override
+    protected void onActivityResult(int req, int res, android.content.Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req != REQ_SAVE_CRX || res != RESULT_OK || data == null || data.getData() == null) return;
+        try (java.io.InputStream in = getAssets().open("GroveVault.crx");
+             java.io.OutputStream out = getContentResolver().openOutputStream(data.getData())) {
+            byte[] buf = new byte[16384];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            Ui.toast(this, "Saved. Now drag it onto Vivaldi's Extensions page");
+        } catch (Exception e) {
+            Ui.toast(this, "Couldn't save: " + e.getMessage());
+        }
+    }
+
+    private void showCode(boolean paired) {
+        final String code = paired ? ExtBridge.code(this) : ExtBridge.newCode(this);
+        android.widget.TextView t = Ui.text(this, code, 24, Ui.TEXT, true);
+        t.setTypeface(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD);
+        t.setTextIsSelectable(true);
+        t.setPadding(Ui.dp(this, 24), Ui.dp(this, 4), Ui.dp(this, 24), Ui.dp(this, 8));
+        android.widget.LinearLayout l = Ui.vertical(this);
+        l.addView(Ui.text(this, "In the browser, open the GroveVault extension → Settings, and enter:", 14, Ui.SUB, false), Ui.margins(this, Ui.MATCH, Ui.WRAP, 24, 0, 24, 8));
+        l.addView(t);
+        l.addView(Ui.text(this, "Keep Grove Vault unlocked (or unlock it) when you log in.", 13, Ui.SUB, false), Ui.margins(this, Ui.MATCH, Ui.WRAP, 24, 4, 24, 0));
+        android.app.AlertDialog.Builder b = Ui.dialog(this, "Pair the extension").setView(l).setPositiveButton("Done", null)
+                .setNeutralButton("Copy", new android.content.DialogInterface.OnClickListener() {
+                    public void onClick(android.content.DialogInterface d, int w) {
+                        android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("code", code));
+                        Ui.toast(SettingsActivity.this, "Copied");
+                    }
+                });
+        if (paired) b.setNegativeButton("New code", new android.content.DialogInterface.OnClickListener() {
+            public void onClick(android.content.DialogInterface d, int w) { showCode(false); }
+        });
+        b.show();
+        if (!paired) render();
+    }
+
 
     @Override
     protected void render() {
@@ -156,6 +198,29 @@ public class SettingsActivity extends BaseActivity {
         Ui.switchRow(this, c, "Copy one-time code after filling", "After filling a login that has 2FA, the current code is copied", Prefs.otpAfterFill(this), new Ui.Cb<Boolean>() {
             public void on(Boolean b) { Prefs.put(SettingsActivity.this, "otp_after_fill", b); }
         });
+
+        // ---------------- browser extension
+        c.addView(Ui.section(this, "Browser extension"));
+        c.addView(Ui.row(this, "Get the extension", "Saves GroveVault.crx. In Vivaldi: Extensions → Developer mode → drag the file from Files onto the page", new View.OnClickListener() {
+            public void onClick(View v) {
+                Session.pickerStarted();
+                startActivityForResult(new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT)
+                        .addCategory(android.content.Intent.CATEGORY_OPENABLE).setType("application/x-chrome-extension")
+                        .putExtra(android.content.Intent.EXTRA_TITLE, "GroveVault.crx"), REQ_SAVE_CRX);
+            }
+        }));
+        final boolean paired = ExtBridge.paired(this);
+        c.addView(Ui.row(this, paired ? "Pairing code" : "Pair the extension", paired ? "Paired. Tap to show the code again or make a new one"
+                : "Shows a code to type into the extension's settings (one time)", new View.OnClickListener() {
+            public void onClick(View v) { showCode(paired); }
+        }));
+        if (paired) c.addView(Ui.row(this, "Unlink extension", "The extension can no longer read your vault", new View.OnClickListener() {
+            public void onClick(View v) {
+                Ui.confirm(SettingsActivity.this, "Unlink extension?", "Browsers paired with this code will stop filling logins.", "Unlink", new Runnable() {
+                    public void run() { ExtBridge.unlink(SettingsActivity.this); render(); }
+                });
+            }
+        }));
 
         // ---------------- appearance
         c.addView(Ui.section(this, "Appearance"));

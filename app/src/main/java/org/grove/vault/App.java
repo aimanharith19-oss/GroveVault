@@ -24,6 +24,7 @@ public class App extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        ExtBridge.start(this); // browser extension bridge (only if paired)
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             public void onActivityCreated(Activity a, Bundle b) {}
             public void onActivityStarted(Activity a) {

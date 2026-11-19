@@ -26,7 +26,7 @@ sed 's#<manifest xmlns:android="http://schemas.android.com/apk/res/android">#<ma
 echo "> aapt2 compile"
 "$AAPT2" compile --dir "$SRC/res" -o "$OUT/res.zip"
 echo "> aapt2 link"
-"$AAPT2" link -I "$ANDROID_JAR" --manifest "$OUT/AndroidManifest.xml" --java "$OUT/gen" \
+"$AAPT2" link -A app/src/main/assets -I "$ANDROID_JAR" --manifest "$OUT/AndroidManifest.xml" --java "$OUT/gen" \
   --min-sdk-version 26 --target-sdk-version 34 \
   --version-code "$VERSION_CODE" --version-name "$VERSION_NAME" \
   -o "$OUT/unsigned.apk" "$OUT/res.zip"

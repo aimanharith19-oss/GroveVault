@@ -59,6 +59,12 @@ An offline, open-source password manager for **Android and Windows**. It has the
 - Fills login, password, 2FA code and credit-card fields. After filling a login, it can copy the 2FA code.
 - **Save prompt** after you log in: it updates the password of a matching card, or opens a new card already filled in.
 
+### Browser extension (Vivaldi and other Chromium browsers on Android)
+- **GroveVault extension** (`extension/`): a 🔑 list appears under username/password boxes with your logins for that site; tap one to fill. The toolbar pop-up fills, copies, and searches your vault. One-time codes fill into 2FA boxes.
+- **Install:** Grove Vault → Settings → Browser extension → *Get the extension* saves `GroveVault.crx`. In Vivaldi open Extensions, turn on Developer mode and drag the file from Files onto the page. Then *Pair the extension* and type the code into the extension's settings.
+- **Security:** the extension talks only to the Grove Vault app on the same phone (127.0.0.1:47920, never the network), every message is AES-256-GCM encrypted with a key from the 100-bit pairing code, old or repeated messages are refused, a page only ever receives logins for its own site (the browser, not the page, says which site), and nothing is returned while the vault is locked. Unlink any time.
+- **Quick Settings pill "Grove autofill":** turns Grove Vault autofill on (one tap in Android's prompt) or pauses/resumes it.
+
 ### Backup and restore
 - **Back up now**: saves an encrypted `.grove` file to the phone, an SD card, or Google Drive, Dropbox or OneDrive through their file pickers.
 - **Restore**, then choose **Replace** (your vault becomes the backup) or **Merge** (newer cards win).
