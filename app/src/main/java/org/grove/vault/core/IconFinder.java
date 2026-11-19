@@ -62,7 +62,7 @@ public final class IconFinder {
                 while (s.find()) size = Math.max(size, Integer.parseInt(s.group(1)));
                 if (size == 0) size = rel.contains("apple-touch-icon") ? 180 : 32;
                 // prefer around 64-192 px; huge icons are wasteful, tiny ones look blurry
-                int score = size >= 64 && size <= 256 ? 1000 - Math.abs(size - 128) : size > 256 ? 500 - size / 10 : size;
+                int score = size >= 96 && size <= 512 ? 1000 - Math.abs(size - 192) / 2 : size > 512 ? 600 - size / 20 : size; // HD first
                 String abs = resolve(pageUrl, href);
                 if (abs != null) found.add(new String[]{abs, String.valueOf(score)});
             }

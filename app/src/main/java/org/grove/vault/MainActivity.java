@@ -466,7 +466,7 @@ public class MainActivity extends BaseActivity {
         };
         // Fluent card: rounded layer with a hairline border, icon in the middle, name underneath
         f.setBackground(Ui.card(this));
-        View icon = Ui.cardIcon(this, c, 44);
+        View icon = Ui.cardIcon(this, c, 60);
         FrameLayout.LayoutParams il = new FrameLayout.LayoutParams(Ui.WRAP, Ui.WRAP, Gravity.CENTER);
         il.bottomMargin = Ui.dp(this, 14);
         f.addView(icon, il);

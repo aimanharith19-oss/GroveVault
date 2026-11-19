@@ -194,7 +194,8 @@ public final class Ui {
     }
 
     public static void ripple(View v, int bg, float radius) {
-        v.setBackground(pressable(v.getContext(), bg == 0 ? null : round(bg, radius), radius));
+        // keep a background the view already has (e.g. a colour swatch) and only add the pressed overlay
+        v.setBackground(pressable(v.getContext(), bg == 0 ? v.getBackground() : round(bg, radius), radius));
         v.setClickable(true);
     }
 
@@ -324,13 +325,38 @@ public final class Ui {
         return f;
     }
 
+    static int iconFor(String g) {
+        switch (g) {
+            case "🔍": return R.drawable.ic_search;
+            case "👁": return R.drawable.ic_eye;
+            case "✏️": return R.drawable.ic_edit;
+            case "🎲": return R.drawable.ic_refresh;
+            case "📞": return R.drawable.ic_phone;
+            case "🗑": return R.drawable.ic_delete;
+            case "✉": return R.drawable.ic_mail;
+            case "⬇": return R.drawable.ic_download;
+            default: return 0;
+        }
+    }
+
     /** Icon-only button with a text glyph (keeps the APK free of image assets). */
     public static TextView iconButton(Context c, String glyph, View.OnClickListener l) {
-        TextView t = text(c, glyph, 18, TEXT, false);
+        int res = iconFor(glyph);
+        TextView t = text(c, res != 0 ? "" : glyph, 18, TEXT, false);
         t.setTypeface(Typeface.DEFAULT);
         t.setGravity(Gravity.CENTER);
         t.setLayoutParams(lp(dp(c, 44), dp(c, 44)));
-        t.setBackground(pressable(c, null, dp(c, R_CONTROL)));
+        if (res != 0) {
+            // emoji icons are coloured; use a line icon in the theme's text colour instead (Fluent style)
+            android.graphics.drawable.Drawable ic = c.getDrawable(res).mutate();
+            ic.setTint(TEXT);
+            android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{pressable(c, null, dp(c, R_CONTROL)), ic});
+            ld.setLayerGravity(1, Gravity.CENTER);
+            ld.setLayerSize(1, dp(c, 20), dp(c, 20));
+            t.setBackground(ld);
+            t.setTag(R.id.grove_icon, Boolean.TRUE);
+            t.setContentDescription(glyph);
+        } else t.setBackground(pressable(c, null, dp(c, R_CONTROL)));
         t.setClickable(true);
         t.setOnClickListener(l);
         return t;
@@ -380,7 +406,11 @@ public final class Ui {
             if (v instanceof TextView) {
                 TextView t = (TextView) v;
                 String s = t.getText().toString();
-                if (s.length() <= 2) {
+                if (t.getTag(R.id.grove_icon) != null) {
+                    LinearLayout.LayoutParams p = lp(dp(a, 48), dp(a, 44));
+                    p.setMargins(dp(a, 2), 0, dp(a, 2), 0);
+                    bar.addView(t, p);
+                } else if (s.length() <= 2) {
                     t.setBackground(pressable(a, null, dp(a, R_CONTROL)));
                     t.setTextColor(TEXT);
                     t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);

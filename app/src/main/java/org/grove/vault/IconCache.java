@@ -37,10 +37,10 @@ import java.util.concurrent.Executors;
 public final class IconCache {
     private IconCache() {}
 
-    private static final int SIZE = 128;
+    private static final int SIZE = 256; // HD: sharp even on the big grid cards
     private static final long RETRY_FAILED_MS = 3L * 86400000L;
     private static final int MAX_PAGE = 400 * 1024, MAX_IMAGE = 768 * 1024;
-    private static final LruCache<String, Bitmap> memory = new LruCache<String, Bitmap>(6 * 1024 * 1024) {
+    private static final LruCache<String, Bitmap> memory = new LruCache<String, Bitmap>((int) Math.min(32L * 1024 * 1024, Runtime.getRuntime().maxMemory() / 8)) {
         @Override
         protected int sizeOf(String k, Bitmap b) { return b.getByteCount(); }
     };
@@ -116,9 +116,21 @@ public final class IconCache {
 
     // ---------------------------------------------------------------- disk
 
+    /** Pixel size of the last image fetchImage() decoded on this thread (to prefer sharp icons). */
+    private static final ThreadLocal<Integer> LAST_SIZE = new ThreadLocal<Integer>() {
+        @Override
+        protected Integer initialValue() { return 0; }
+    };
+
     private static File dir(Context c) {
-        File d = new File(c.getNoBackupFilesDir(), "icons");
-        if (!d.exists()) d.mkdirs();
+        File d = new File(c.getNoBackupFilesDir(), "icons-hd"); // new folder: icons are fetched again in HD
+        if (!d.exists()) {
+            d.mkdirs();
+            File old = new File(c.getNoBackupFilesDir(), "icons"); // the old low-resolution cache
+            File[] fs = old.listFiles();
+            if (fs != null) for (File f : fs) f.delete();
+            old.delete();
+        }
         return d;
     }
 
@@ -201,14 +213,22 @@ public final class IconCache {
         for (String host : hosts) {
             String[] page = fetchPage("https://" + host + "/");
             List<String> cands = IconFinder.candidates(page != null ? page[0] : "https://" + host + "/", page != null ? page[1] : null);
-            int tries = 0;
+            int tries = 0, bestSize = 0;
+            Bitmap best = null;
             for (String u : cands) {
-                if (tries++ >= 5) break;
+                if (tries++ >= 6) break;
                 Bitmap b = fetchImage(u);
-                if (b != null) {
+                if (b == null) continue;
+                int sz = LAST_SIZE.get();
+                if (sz >= 144) { // big enough to look sharp: take it
                     writeDisk(c, key, b);
                     return b;
                 }
+                if (sz > bestSize) { best = b; bestSize = sz; } // keep looking for a sharper one
+            }
+            if (best != null) {
+                writeDisk(c, key, best);
+                return best;
             }
         }
         markFailed(c, key);
@@ -305,6 +325,7 @@ public final class IconCache {
             o.inJustDecodeBounds = true;
             BitmapFactory.decodeByteArray(data, 0, data.length, o);
             if (o.outWidth < 16 || o.outHeight < 16) return null;
+            LAST_SIZE.set(Math.min(o.outWidth, o.outHeight));
             int sample = 1;
             while (o.outWidth / (sample * 2) >= SIZE && o.outHeight / (sample * 2) >= SIZE) sample *= 2;
             BitmapFactory.Options o2 = new BitmapFactory.Options();
