@@ -155,7 +155,7 @@ public class SettingsActivity extends BaseActivity {
         for (int k = 0; k < Ui.ACCENTS.length; k++) {
             final int col = Ui.ACCENTS[k];
             View sw = new View(this);
-            sw.setBackground(Ui.stroke(col, col == cur ? Ui.TEXT : col, Ui.dp(this, 3), 0));
+            sw.setBackground(Ui.stroke(col, col == cur ? Ui.TEXT : col, Ui.dp(this, 3), Ui.dp(this, Ui.R_CONTROL)));
             sw.setContentDescription(Ui.ACCENT_NAMES[k]);
             android.widget.GridLayout.LayoutParams gp = new android.widget.GridLayout.LayoutParams();
             gp.width = cell - Ui.dp(this, 8);

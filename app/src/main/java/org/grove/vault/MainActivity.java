@@ -82,7 +82,7 @@ public class MainActivity extends BaseActivity {
                 showCards();
             }
         });
-        LinearLayout bar = Ui.topBar(this, "grovevault", false, addBtn, searchBtn, viewBtn, menuBtn);
+        LinearLayout bar = Ui.topBar(this, "GroveVault", false, addBtn, searchBtn, viewBtn, menuBtn);
         header = bar;
         root.addView(bar);
         search = Ui.edit(this, "Search cards", InputType.TYPE_CLASS_TEXT);
@@ -250,20 +250,7 @@ public class MainActivity extends BaseActivity {
      * Panorama parallax spread over however many tabs there are: across all of them the title slides by half its
      * width (or by what doesn't fit on screen, if more), like the Windows Phone panorama.
      */
-    private float titleShift(View title, float pos) {
-        int n = pivotKeys.size();
-        if (n < 2) return 0;
-        float avail = header.getWidth() - header.getPaddingLeft();
-        float max = Math.max(title.getWidth() * 0.5f, title.getWidth() - avail + Ui.dp(this, 24));
-        return -max * Math.max(0, Math.min(n - 1, pos)) / (n - 1);
-    }
-
-    private void parallax(float pos) {
-        View title = header == null ? null : header.findViewWithTag("grove_title");
-        if (title == null) return;
-        title.animate().cancel();
-        title.setTranslationX(titleShift(title, pos));
-    }
+    private void parallax(float pos) {}
 
     /** Tapping a pivot header: slide the list across and move the headers. */
     private void goTo(final int k) {
@@ -287,9 +274,6 @@ public class MainActivity extends BaseActivity {
         chips.animateTo(k);
         refresh();
         cardsView.setSelection(0);
-        View title = header == null ? null : header.findViewWithTag("grove_title");
-        if (title != null) title.animate().translationX(titleShift(title, k)).setDuration(450)
-                .setInterpolator(new android.view.animation.DecelerateInterpolator(2.5f)).start();
     }
 
     private android.view.View.OnTouchListener swipeListener() {
@@ -480,21 +464,25 @@ public class MainActivity extends BaseActivity {
             @Override
             protected void onMeasure(int w, int h) { super.onMeasure(w, w); }
         };
-        f.setBackgroundColor(Ui.cardColor(c.color));
-        View icon = Ui.cardIcon(this, c, 54); // letter (same colour as the tile) until the site icon arrives
-        f.addView(icon, new FrameLayout.LayoutParams(Ui.WRAP, Ui.WRAP, Gravity.CENTER));
-        TextView title = Ui.text(this, c.title.length() == 0 ? "(untitled)" : c.title, 13, 0xFFFFFFFF, false);
+        // Fluent card: rounded layer with a hairline border, icon in the middle, name underneath
+        f.setBackground(Ui.card(this));
+        View icon = Ui.cardIcon(this, c, 44);
+        FrameLayout.LayoutParams il = new FrameLayout.LayoutParams(Ui.WRAP, Ui.WRAP, Gravity.CENTER);
+        il.bottomMargin = Ui.dp(this, 14);
+        f.addView(icon, il);
+        TextView title = Ui.text(this, c.title.length() == 0 ? "(untitled)" : c.title, 13, Ui.TEXT, false);
         title.setSingleLine(true);
+        title.setGravity(Gravity.CENTER);
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        FrameLayout.LayoutParams tl = new FrameLayout.LayoutParams(Ui.MATCH, Ui.WRAP, Gravity.BOTTOM | Gravity.START);
-        tl.setMargins(Ui.dp(this, 8), 0, Ui.dp(this, 8), Ui.dp(this, 6));
+        FrameLayout.LayoutParams tl = new FrameLayout.LayoutParams(Ui.MATCH, Ui.WRAP, Gravity.BOTTOM);
+        tl.setMargins(Ui.dp(this, 8), 0, Ui.dp(this, 8), Ui.dp(this, 10));
         f.addView(title, tl);
         String badges = "";
         if (!c.template && Prefs.showWarnings(this) && (Audit.isExpired(c, System.currentTimeMillis()) || Audit.hasWeakPassword(c) || Audit.isReused(c, reused))) badges += "⚠";
         for (Field pf : c.fields) if (Field.PASSKEY.equals(pf.type)) { badges += "🔐"; break; }
         if (c.favorite) badges += "★";
         if (badges.length() > 0) {
-            TextView b = Ui.text(this, badges, 12, 0xFFFFFFFF, false);
+            TextView b = Ui.text(this, badges, 12, Ui.WARN, false);
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(Ui.WRAP, Ui.WRAP, Gravity.TOP | Gravity.END);
             lp.setMargins(0, Ui.dp(this, 5), Ui.dp(this, 7), 0);
             f.addView(b, lp);
@@ -512,18 +500,19 @@ public class MainActivity extends BaseActivity {
             Card c = shown.get(pos);
             if (Prefs.p(MainActivity.this).getBoolean("grid", false)) return tile(c);
             LinearLayout r = Ui.horizontal(MainActivity.this);
-            r.setPadding(Ui.dp(MainActivity.this, 20), Ui.dp(MainActivity.this, 5), Ui.dp(MainActivity.this, 16), Ui.dp(MainActivity.this, 5));
+            r.setPadding(Ui.dp(MainActivity.this, 20), Ui.dp(MainActivity.this, 8), Ui.dp(MainActivity.this, 16), Ui.dp(MainActivity.this, 8));
             r.setGravity(Gravity.CENTER_VERTICAL);
-            r.addView(Ui.cardIcon(MainActivity.this, c, 46));
+            r.setMinimumHeight(Ui.dp(MainActivity.this, 60));
+            r.addView(Ui.cardIcon(MainActivity.this, c, 36));
             LinearLayout tx = Ui.vertical(MainActivity.this);
             tx.setPadding(Ui.dp(MainActivity.this, 14), 0, Ui.dp(MainActivity.this, 8), 0);
-            TextView t = Ui.text(MainActivity.this, c.title.length() == 0 ? "(untitled)" : c.title, 19, Ui.TEXT, false);
+            TextView t = Ui.text(MainActivity.this, c.title.length() == 0 ? "(untitled)" : c.title, 15, Ui.TEXT, false);
             t.setSingleLine(true);
             t.setEllipsize(android.text.TextUtils.TruncateAt.END);
             tx.addView(t);
             String sub = c.template ? c.fields.size() + " fields" : c.subtitle();
             if (sub.length() > 0) {
-                TextView s = Ui.text(MainActivity.this, sub, 13, Ui.SUB, false);
+                TextView s = Ui.text(MainActivity.this, sub, 12.5f, Ui.SUB, false);
                 s.setSingleLine(true);
                 s.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 tx.addView(s);

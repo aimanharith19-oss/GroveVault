@@ -84,22 +84,22 @@ public final class Ui {
         ACCENT = Prefs.accent(a);
         ON_ACCENT = 0xFFFFFFFF;
         if (dark) {
-            BG = 0xFF000000;
-            SURFACE = 0xFF1F1F1F;
-            SURFACE2 = 0xFF2E2E2E;
+            BG = 0xFF202020;       // Mica (dark)
+            SURFACE = 0xFF2B2B2B;  // card
+            SURFACE2 = 0xFF323232; // control / flyout
             TEXT = 0xFFFFFFFF;
-            SUB = 0xFF8A8A8A;
-            DIVIDER = 0x00000000;
+            SUB = 0xFFC5C5C5;
+            DIVIDER = 0x15FFFFFF;
             DANGER = 0xFFFF5A4E;
             WARN = 0xFFF0A30A;
             a.setTheme(translucent ? R.style.AppTranslucentDark : R.style.AppDark);
         } else {
-            BG = 0xFFFFFFFF;
-            SURFACE = 0xFFF0F0F0;
-            SURFACE2 = 0xFFE2E2E2;
-            TEXT = 0xFF000000;
-            SUB = 0xFF6B6B6B;
-            DIVIDER = 0x00000000;
+            BG = 0xFFF3F3F3;       // Mica (light)
+            SURFACE = 0xFFFBFBFB;
+            SURFACE2 = 0xFFFFFFFF;
+            TEXT = 0xFF1B1B1B;
+            SUB = 0xFF5F5F5F;
+            DIVIDER = 0x12000000;
             DANGER = 0xFFE51400;
             WARN = 0xFFC27D00;
             a.setTheme(translucent ? R.style.AppTranslucent : R.style.AppLight);
@@ -108,7 +108,7 @@ public final class Ui {
             if (!Prefs.allowScreenshots(a)) a.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
             return;
         }
-        a.getWindow().setStatusBarColor(blend(BG, ACCENT, dark ? 0.36f : 0.22f));
+        a.getWindow().setStatusBarColor(blend(BG, ACCENT, 0.06f));
         a.getWindow().setNavigationBarColor(BG);
         int flags = a.getWindow().getDecorView().getSystemUiVisibility();
         if (!dark) flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | 0x10; // light nav bar (API 26)
@@ -125,26 +125,39 @@ public final class Ui {
         return 0xFF000000 | Math.round(ar + (br - ar) * t) << 16 | Math.round(ag + (bg - ag) * t) << 8 | Math.round(ab + (bb - ab) * t);
     }
 
-    public static final Typeface LIGHT = Typeface.create("sans-serif-light", Typeface.NORMAL);
+    public static final Typeface LIGHT = Typeface.create("sans-serif", Typeface.NORMAL);
     public static final Typeface SEMI = Typeface.create("sans-serif-medium", Typeface.NORMAL);
+    /** Fluent corner radii: 4dp controls, 8dp cards and flyouts. */
+    public static final float R_CONTROL = 4, R_CARD = 8;
 
-    /** Windows Phone "tilt": the item tips toward the finger and shrinks slightly while pressed. */
+    /** Fluent card: layer fill with a hairline stroke and 8dp corners. */
+    public static GradientDrawable card(Context c) {
+        return stroke(SURFACE, DIVIDER, Math.max(1, dp(c, 1)), dp(c, R_CARD));
+    }
+
+    /** Pressed-state overlay on top of a background (Fluent's "subtle fill"). */
+    public static android.graphics.drawable.Drawable pressable(Context c, android.graphics.drawable.Drawable normal, float radiusPx) {
+        android.graphics.drawable.StateListDrawable st = new android.graphics.drawable.StateListDrawable();
+        android.graphics.drawable.Drawable over = round(dark ? 0x14FFFFFF : 0x0A000000, radiusPx);
+        android.graphics.drawable.Drawable pressed = normal == null ? over : new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{normal, over});
+        st.addState(new int[]{android.R.attr.state_pressed}, pressed);
+        st.addState(new int[]{}, normal == null ? new android.graphics.drawable.ColorDrawable(0) : normal);
+        st.setExitFadeDuration(150);
+        return st;
+    }
+
+    /** Fluent press: a slight shrink while pressed (no tilt). */
     public static void tilt(final View v) {
         v.setOnTouchListener(new View.OnTouchListener() {
             public boolean onTouch(View view, android.view.MotionEvent e) {
-                if (!view.isClickable()) return false; // would never get the UP event and stay tilted
+                if (!view.isClickable()) return false;
                 switch (e.getActionMasked()) {
-                    case android.view.MotionEvent.ACTION_DOWN: {
-                        float w = Math.max(1, view.getWidth()), h = Math.max(1, view.getHeight());
-                        float nx = (e.getX() / w - 0.5f) * 2f, ny = (e.getY() / h - 0.5f) * 2f;
-                        float max = w > dp(view.getContext(), 240) ? 3f : 9f;
-                        view.setCameraDistance(14000 * view.getResources().getDisplayMetrics().density);
-                        view.animate().rotationY(-nx * max).rotationX(ny * max).scaleX(0.965f).scaleY(0.965f).setDuration(90).start();
+                    case android.view.MotionEvent.ACTION_DOWN:
+                        view.animate().scaleX(0.98f).scaleY(0.98f).setDuration(80).start();
                         break;
-                    }
                     case android.view.MotionEvent.ACTION_UP:
                     case android.view.MotionEvent.ACTION_CANCEL:
-                        view.animate().rotationY(0).rotationX(0).scaleX(1).scaleY(1).setDuration(240)
+                        view.animate().scaleX(1).scaleY(1).setDuration(200)
                                 .setInterpolator(new android.view.animation.DecelerateInterpolator(2f)).start();
                         break;
                 }
@@ -167,10 +180,10 @@ public final class Ui {
         });
     }
 
-    /** Metro shapes are square; the radius argument is kept for compatibility and ignored. */
     public static GradientDrawable round(int color, float radiusPx) {
         GradientDrawable g = new GradientDrawable();
         g.setColor(color);
+        g.setCornerRadius(radiusPx);
         return g;
     }
 
@@ -181,9 +194,8 @@ public final class Ui {
     }
 
     public static void ripple(View v, int bg, float radius) {
-        if (bg != 0) v.setBackground(round(bg, 0));
+        v.setBackground(pressable(v.getContext(), bg == 0 ? null : round(bg, radius), radius));
         v.setClickable(true);
-        tilt(v);
     }
 
     public static LinearLayout vertical(Context c) {
@@ -204,8 +216,7 @@ public final class Ui {
         t.setText(s);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
         t.setTextColor(color);
-        if (bold) t.setTypeface(SEMI);
-        else if (sp >= 19) t.setTypeface(LIGHT); // Windows Phone's big thin type
+        t.setTypeface(bold || sp >= 19 ? SEMI : Typeface.DEFAULT); // Fluent: titles semibold, body regular
         return t;
     }
 
@@ -226,26 +237,25 @@ public final class Ui {
     public static final int MATCH = ViewGroup.LayoutParams.MATCH_PARENT;
     public static final int WRAP = ViewGroup.LayoutParams.WRAP_CONTENT;
 
-    /** Windows Phone button: square outline, lowercase label, fills with the accent while pressed. */
+    /** Fluent accent button: filled with the accent, 4dp corners. */
     public static TextView button(Context c, String label, View.OnClickListener l) {
-        TextView b = text(c, label.toLowerCase(), 18, TEXT, false);
-        b.setTypeface(Typeface.DEFAULT);
+        TextView b = text(c, label, 15, ON_ACCENT, true);
         b.setGravity(Gravity.CENTER);
-        b.setPadding(dp(c, 20), dp(c, 12), dp(c, 20), dp(c, 12));
-        android.graphics.drawable.StateListDrawable st = new android.graphics.drawable.StateListDrawable();
-        st.addState(new int[]{android.R.attr.state_pressed}, stroke(ACCENT, ACCENT, dp(c, 2), 0));
-        st.addState(new int[]{}, stroke(0x00000000, TEXT, dp(c, 2), 0));
-        b.setBackground(st);
+        b.setMinHeight(dp(c, 40));
+        b.setPadding(dp(c, 20), dp(c, 8), dp(c, 20), dp(c, 8));
+        b.setBackground(pressable(c, round(ACCENT, dp(c, R_CONTROL)), dp(c, R_CONTROL)));
         b.setOnClickListener(l);
         tilt(b);
         return b;
     }
 
-    /** Text action in the accent colour (like "shuffle all" in Grove Music). */
+    /** Fluent standard button: neutral fill with a hairline stroke. */
     public static TextView flatButton(Context c, String label, View.OnClickListener l) {
-        TextView b = text(c, label.toLowerCase(), 19, ACCENT, false);
-        b.setGravity(Gravity.CENTER_VERTICAL);
-        b.setPadding(dp(c, 4), dp(c, 10), dp(c, 12), dp(c, 10));
+        TextView b = text(c, label, 15, TEXT, false);
+        b.setGravity(Gravity.CENTER);
+        b.setMinHeight(dp(c, 40));
+        b.setPadding(dp(c, 16), dp(c, 8), dp(c, 16), dp(c, 8));
+        b.setBackground(pressable(c, stroke(SURFACE2, DIVIDER, Math.max(1, dp(c, 1)), dp(c, R_CONTROL)), dp(c, R_CONTROL)));
         b.setClickable(true);
         tilt(b);
         b.setOnClickListener(l);
@@ -258,7 +268,7 @@ public final class Ui {
         t.setText(glyph(icon));
         t.setGravity(Gravity.CENTER);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeDp * 0.40f);
-        t.setBackground(round(cardColor(colorIndex), 0));
+        t.setBackground(round(cardColor(colorIndex), dp(c, R_CONTROL)));
         t.setLayoutParams(lp(dp(c, sizeDp), dp(c, sizeDp)));
         return t;
     }
@@ -272,15 +282,13 @@ public final class Ui {
         return true;
     }
 
-    /** Windows Phone letter tile: a coloured square with a thin lowercase letter in the bottom-left corner. */
+    /** Rounded colour tile with the title's first letter (used until the site icon arrives). */
     public static TextView letterTile(Context c, String title, int color, int sizeDp) {
-        String l = title == null || title.trim().length() == 0 ? "#" : title.trim().substring(0, 1).toLowerCase();
-        TextView t = text(c, l, sizeDp * 0.52f, 0xFFFFFFFF, false);
-        t.setTypeface(LIGHT);
-        t.setGravity(Gravity.BOTTOM | Gravity.START);
-        t.setPadding(dp(c, sizeDp * 0.12f), 0, 0, dp(c, sizeDp * 0.02f));
+        String l = title == null || title.trim().length() == 0 ? "#" : title.trim().substring(0, 1).toUpperCase();
+        TextView t = text(c, l, sizeDp * 0.42f, 0xFFFFFFFF, true);
+        t.setGravity(Gravity.CENTER);
         t.setIncludeFontPadding(false);
-        t.setBackground(round(color, 0));
+        t.setBackground(round(color, dp(c, sizeDp >= 48 ? R_CARD : R_CONTROL)));
         t.setLayoutParams(lp(dp(c, sizeDp), dp(c, sizeDp)));
         return t;
     }
@@ -296,7 +304,8 @@ public final class Ui {
         final String key = IconCache.keyFor(card);
         if (key == null) return f;
         final android.widget.ImageView iv = new android.widget.ImageView(c);
-        iv.setBackground(round(0xFFFFFFFF, 0));
+        iv.setBackground(round(0xFFFFFFFF, dp(c, sizeDp >= 48 ? R_CARD : R_CONTROL)));
+        iv.setClipToOutline(true);
         int pad = Math.round(dp(c, sizeDp) * 0.14f);
         iv.setPadding(pad, pad, pad, pad);
         iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
@@ -317,66 +326,38 @@ public final class Ui {
 
     /** Icon-only button with a text glyph (keeps the APK free of image assets). */
     public static TextView iconButton(Context c, String glyph, View.OnClickListener l) {
-        TextView t = text(c, glyph, 19, TEXT, false);
+        TextView t = text(c, glyph, 18, TEXT, false);
         t.setTypeface(Typeface.DEFAULT);
         t.setGravity(Gravity.CENTER);
         t.setLayoutParams(lp(dp(c, 44), dp(c, 44)));
+        t.setBackground(pressable(c, null, dp(c, R_CONTROL)));
         t.setClickable(true);
-        tilt(t);
         t.setOnClickListener(l);
         return t;
     }
 
     /**
-     * Windows Phone page header: small caps app name and a huge, thin, lowercase page title. Actions go to the
-     * round-button application bar at the bottom of the screen (back is the phone's back gesture/button).
-     * back=false marks the hub page, which gets the bigger "panorama" title.
+     * Fluent page header (like Grove Launcher's settings): a back arrow and a 28sp semibold title; on the home page
+     * just the app name. Actions go to the command bar at the bottom.
      */
     public static LinearLayout topBar(final Activity a, String title, boolean back, View... actions) {
-        // same header as Grove Music: "GROVEVAULT" 15sp semibold + 56sp light page title; the hub gets GroveBook's
-        // 84sp panorama title that runs off the right edge
-        LinearLayout h = vertical(a);
-        h.setClipChildren(true);
-        h.setPadding(back ? dp(a, 20) : dp(a, 12), back ? dp(a, 14) : dp(a, 4), dp(a, 0), dp(a, 4));
+        LinearLayout h = horizontal(a);
+        h.setGravity(Gravity.CENTER_VERTICAL);
+        h.setPadding(back ? dp(a, 6) : dp(a, 20), dp(a, 12), dp(a, 16), dp(a, 8));
         if (back) {
-            TextView app = text(a, "GROVEVAULT", 15, TEXT, true);
-            h.addView(app);
+            TextView b = iconButton(a, "\u2190", new View.OnClickListener() {
+                public void onClick(View v) { a.onBackPressed(); }
+            });
+            b.setContentDescription("Back");
+            h.addView(b);
         }
         if (title != null && title.length() > 0) {
-            float sp = back ? 56 : 72;
-            TextView t = text(a, title.toLowerCase(), sp, TEXT, false);
-            t.setTypeface(LIGHT);
+            TextView t = text(a, title, 28, TEXT, true);
             t.setSingleLine(true);
-            t.setHorizontallyScrolling(true);
-            t.setLetterSpacing(back ? -0.01f : -3f / 72f);
-            t.setIncludeFontPadding(false);
-            t.setPadding(0, 0, 0, dp(a, 8));
+            t.setEllipsize(android.text.TextUtils.TruncateAt.END);
             t.setTag("grove_title");
-            if (back) h.addView(t, lp(MATCH, WRAP));
-            else {
-                // the panorama title is measured at its full width (wider than the screen), so sliding it left
-                // never cuts the end of the word off
-                FrameLayout clip = new FrameLayout(a) {
-                    @Override
-                    protected void onMeasure(int w, int hs) {
-                        TextView c = (TextView) getChildAt(0);
-                        c.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
-                        setMeasuredDimension(MeasureSpec.getSize(w), c.getMeasuredHeight());
-                    }
-
-                    @Override
-                    protected void onLayout(boolean ch, int l, int tp, int r, int b) {
-                        View c = getChildAt(0);
-                        c.layout(0, 0, c.getMeasuredWidth(), c.getMeasuredHeight());
-                    }
-                };
-                t.setHorizontallyScrolling(false);
-                clip.setClipChildren(false); // the small parallax drift moves into the left margin, not under a clip
-                h.setClipChildren(false);
-                h.setClipToPadding(false);
-                clip.addView(t);
-                h.addView(clip, lp(MATCH, WRAP));
-            }
+            t.setPadding(back ? dp(a, 6) : 0, 0, 0, 0);
+            h.addView(t, lpw(1));
         }
         appBar(a, actions);
         return h;
@@ -400,22 +381,22 @@ public final class Ui {
                 TextView t = (TextView) v;
                 String s = t.getText().toString();
                 if (s.length() <= 2) {
-                    GradientDrawable ring = new GradientDrawable();
-                    ring.setShape(GradientDrawable.OVAL);
-                    ring.setStroke(dp(a, 2), TEXT);
-                    t.setBackground(ring);
+                    t.setBackground(pressable(a, null, dp(a, R_CONTROL)));
                     t.setTextColor(TEXT);
-                    t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
-                    LinearLayout.LayoutParams p = lp(dp(a, 46), dp(a, 46));
-                    p.setMargins(dp(a, 10), 0, dp(a, 10), 0);
+                    t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+                    LinearLayout.LayoutParams p = lp(dp(a, 48), dp(a, 44));
+                    p.setMargins(dp(a, 2), 0, dp(a, 2), 0);
                     bar.addView(t, p);
                 } else {
-                    t.setText(s.toLowerCase());
-                    t.setTextColor(TEXT);
-                    t.setBackground(null);
-                    t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
-                    LinearLayout.LayoutParams p = lp(WRAP, WRAP);
-                    p.setMargins(dp(a, 10), 0, dp(a, 10), 0);
+                    // text command (e.g. "Save"): the accent button
+                    t.setTextColor(ON_ACCENT);
+                    t.setTypeface(SEMI);
+                    t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+                    t.setGravity(Gravity.CENTER);
+                    t.setPadding(dp(a, 18), 0, dp(a, 18), 0);
+                    t.setBackground(pressable(a, round(ACCENT, dp(a, R_CONTROL)), dp(a, R_CONTROL)));
+                    LinearLayout.LayoutParams p = lp(WRAP, dp(a, 38));
+                    p.setMargins(dp(a, 6), 0, dp(a, 6), 0);
                     bar.addView(t, p);
                 }
             } else bar.addView(v);
@@ -432,30 +413,39 @@ public final class Ui {
         return v;
     }
 
+    /** Fluent settings group header: 14sp semibold. */
     public static TextView section(Context c, String s) {
-        TextView t = text(c, s.toLowerCase(), 20, ACCENT, false);
-        t.setPadding(dp(c, 20), dp(c, 22), dp(c, 20), dp(c, 4));
-        t.setTag("grove_section"); // pivotize() turns these into pivot pages
+        TextView t = text(c, s, 14, TEXT, true);
+        t.setPadding(dp(c, 20), dp(c, 20), dp(c, 20), dp(c, 6));
+        t.setTag("grove_section"); // pivotize() turns these into tabs
         return t;
     }
 
-    /** A tappable two-line row. */
+    /** Fluent settings card: a rounded card per row, title + secondary text. */
     public static LinearLayout row(Context c, String title, String subtitle, View.OnClickListener l) {
         LinearLayout r = horizontal(c);
-        r.setPadding(dp(c, 20), dp(c, 10), dp(c, 20), dp(c, 10));
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setMinimumHeight(dp(c, 64));
+        r.setPadding(dp(c, 16), dp(c, 12), dp(c, 16), dp(c, 12));
         LinearLayout tx = vertical(c);
-        TextView tt = text(c, title.toLowerCase(), 21, TEXT, false);
+        TextView tt = text(c, title, 15, TEXT, false);
         tx.addView(tt);
         if (subtitle != null && subtitle.length() > 0) {
-            TextView s = text(c, subtitle, 14, SUB, false);
+            TextView s = text(c, subtitle, 12.5f, SUB, false);
             s.setPadding(0, dp(c, 2), 0, 0);
             tx.addView(s);
         }
         r.addView(tx, lpw(1));
+        r.setBackground(card(c));
         if (l != null) {
-            ripple(r, 0, 0);
+            r.setBackground(pressable(c, card(c), dp(c, R_CARD)));
+            r.setClickable(true);
             r.setOnClickListener(l);
+            TextView chev = text(c, "\u203A", 22, SUB, false);
+            chev.setPadding(dp(c, 12), 0, 0, dp(c, 2));
+            r.addView(chev);
         }
+        r.setLayoutParams(margins(c, MATCH, WRAP, 16, 2, 16, 2));
         return r;
     }
 
@@ -472,7 +462,8 @@ public final class Ui {
         s.setThumbTintList(new ColorStateList(states, new int[]{0xFFFFFFFF, dark ? 0xFFBBBBBB : 0xFF777777}));
         s.setTrackTintList(new ColorStateList(states, new int[]{ACCENT, dark ? 0xFF555555 : 0xFFBBBBBB}));
         r.addView(s);
-        ripple(r, 0, 0);
+        r.setBackground(pressable(c, card(c), dp(c, R_CARD)));
+        r.setClickable(true);
         r.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 s.toggle();
@@ -487,26 +478,33 @@ public final class Ui {
         return s;
     }
 
+    /** Fluent text box: rounded fill, hairline border, accent underline while typing. */
     public static EditText edit(Context c, String hint, int inputType) {
         EditText e = new EditText(c);
         e.setHint(hint);
         e.setInputType(inputType);
         e.setTextColor(TEXT);
         e.setHintTextColor(SUB);
-        e.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
-        e.setPadding(dp(c, 12), dp(c, 11), dp(c, 12), dp(c, 11));
-        // Windows Phone text box: square, light fill, accent border while typing
+        e.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        e.setPadding(dp(c, 12), dp(c, 10), dp(c, 12), dp(c, 10));
+        e.setMinHeight(dp(c, 40));
+        int fill = dark ? 0x0FFFFFFF : 0xB3FFFFFF, r = dp(c, R_CONTROL);
+        GradientDrawable box = stroke(fill, dark ? 0x14FFFFFF : 0x0F000000, Math.max(1, dp(c, 1)), r);
+        GradientDrawable boxF = stroke(dark ? 0xFF1F1F1F : 0xFFFFFFFF, dark ? 0x14FFFFFF : 0x0F000000, Math.max(1, dp(c, 1)), r);
+        GradientDrawable line = round(ACCENT, 0);
+        GradientDrawable lineN = round(dark ? 0x8AFFFFFF : 0x72000000, 0);
+        android.graphics.drawable.LayerDrawable focused = new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{boxF, line});
+        focused.setLayerGravity(1, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL);
+        focused.setLayerHeight(1, dp(c, 2));
+        focused.setLayerInset(1, r / 2, 0, r / 2, 0);
+        android.graphics.drawable.LayerDrawable normal = new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{box, lineN});
+        normal.setLayerGravity(1, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL);
+        normal.setLayerHeight(1, Math.max(1, dp(c, 1)));
+        normal.setLayerInset(1, r / 2, 0, r / 2, 0);
         android.graphics.drawable.StateListDrawable st = new android.graphics.drawable.StateListDrawable();
-        st.addState(new int[]{android.R.attr.state_focused}, stroke(dark ? 0xFFFFFFFF : 0xFFFFFFFF, ACCENT, dp(c, 2), 0));
-        st.addState(new int[]{}, stroke(dark ? 0x33FFFFFF : 0xFFF0F0F0, dark ? 0x99FFFFFF : 0xFF999999, dp(c, 2), 0));
+        st.addState(new int[]{android.R.attr.state_focused}, focused);
+        st.addState(new int[]{}, normal);
         e.setBackground(st);
-        e.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-            public void onFocusChange(View v, boolean has) {
-                // focused box is white like Windows Phone, so text turns black
-                ((EditText) v).setTextColor(has ? 0xFF000000 : TEXT);
-                ((EditText) v).setHintTextColor(has ? 0xFF888888 : SUB);
-            }
-        });
         // Ask the keyboard not to learn or store what's typed here.
         e.setImeOptions(e.getImeOptions() | android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
         e.setFilterTouchesWhenObscured(true);
@@ -516,91 +514,117 @@ public final class Ui {
     public static final int PASSWORD_INPUT = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
     public static final int VISIBLE_PASSWORD_INPUT = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
 
-    /** Grove Music's pivot headers: 46sp light words; the current one sits at the left edge, the rest are faded. */
+    /**
+     * Fluent selector bar (tabs): 15sp labels, the selected one semibold with a short accent pill under it that
+     * slides with the finger while swiping between pages.
+     */
     public static class PivotHeader extends FrameLayout {
         private final LinearLayout row;
+        private final View pill;
         private int current;
+        private android.animation.ValueAnimator anim;
 
         public PivotHeader(Context c) {
             super(c);
             setClipChildren(true);
             row = horizontal(c);
-            row.setPadding(dp(c, 18), 0, 0, dp(c, 6));
+            row.setPadding(dp(c, 12), 0, dp(c, 12), 0);
             addView(row, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            pill = new View(c);
+            pill.setBackground(round(ACCENT, dp(c, 2)));
+            addView(pill, new FrameLayout.LayoutParams(dp(c, 16), dp(c, 3)));
         }
 
         @Override
         protected void onMeasure(int w, int h) {
-            // let the row be as wide as it likes (it runs off the right edge)
             row.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
-            setMeasuredDimension(MeasureSpec.getSize(w), row.getMeasuredHeight());
+            pill.measure(MeasureSpec.makeMeasureSpec(dp(getContext(), 16), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(dp(getContext(), 3), MeasureSpec.EXACTLY));
+            setMeasuredDimension(MeasureSpec.getSize(w), row.getMeasuredHeight() + dp(getContext(), 4));
         }
 
         @Override
         protected void onLayout(boolean ch, int l, int t, int r, int b) {
             row.layout(0, 0, row.getMeasuredWidth(), row.getMeasuredHeight());
+            int y = row.getMeasuredHeight() - dp(getContext(), 5);
+            pill.layout(0, y, pill.getMeasuredWidth(), y + pill.getMeasuredHeight());
+            drag(0);
         }
 
         public void set(String[] names, int selected, final Cb<Integer> onTap) {
             row.removeAllViews();
             for (int i = 0; i < names.length; i++) {
                 final int idx = i;
-                TextView t = text(getContext(), names[i].toLowerCase(), 40, TEXT, false);
-                t.setTypeface(LIGHT);
+                TextView t = text(getContext(), names[i], 15, TEXT, false);
                 t.setSingleLine(true);
-                t.setIncludeFontPadding(false);
-                t.setPadding(0, 0, dp(getContext(), 22), 0);
+                t.setGravity(Gravity.CENTER);
+                t.setPadding(dp(getContext(), 12), dp(getContext(), 10), dp(getContext(), 12), dp(getContext(), 14));
+                t.setBackground(pressable(getContext(), null, dp(getContext(), R_CONTROL)));
                 t.setOnClickListener(new View.OnClickListener() {
                     public void onClick(View v) { onTap.on(idx); }
                 });
                 row.addView(t);
             }
             current = selected;
-            post(new Runnable() {
-                public void run() { drag(0); }
-            });
+            requestLayout();
         }
 
-        private float offsetFor(float pos) {
+        private float centerAt(float pos) {
             int n = row.getChildCount();
             if (n == 0) return 0;
             pos = Math.max(0, Math.min(n - 1, pos));
             int i = (int) Math.floor(pos);
             float f = pos - i;
             View a = row.getChildAt(i), b = row.getChildAt(Math.min(n - 1, i + 1));
-            return a.getLeft() - row.getPaddingLeft() + (b.getLeft() - a.getLeft()) * f;
+            float ca = a.getLeft() + a.getWidth() / 2f, cb = b.getLeft() + b.getWidth() / 2f;
+            return ca + (cb - ca) * f;
+        }
+
+        private void place(float pos) {
+            int n = row.getChildCount();
+            if (n == 0 || getWidth() == 0) return;
+            // keep the selected tab in view when the tabs are wider than the screen
+            float overflow = Math.max(0, row.getWidth() - getWidth());
+            float scroll = Math.max(0, Math.min(overflow, centerAt(pos) - getWidth() / 2f));
+            row.setTranslationX(-scroll);
+            pill.setTranslationX(centerAt(pos) - scroll - pill.getWidth() / 2f);
+            int sel = Math.round(pos);
+            for (int k = 0; k < n; k++) {
+                TextView t = (TextView) row.getChildAt(k);
+                t.setTextColor(k == sel ? TEXT : SUB);
+                t.setTypeface(k == sel ? SEMI : Typeface.DEFAULT);
+            }
         }
 
         /** frac: how far (in pages) the finger has dragged from the current page; negative = towards the previous. */
-        private android.animation.ValueAnimator anim;
-
         public void drag(float frac) {
             if (anim != null) { anim.cancel(); anim = null; }
-            float pos = current + frac;
-            row.setTranslationX(-offsetFor(pos));
-            for (int k = 0; k < row.getChildCount(); k++)
-                row.getChildAt(k).setAlpha(0.35f + 0.65f * Math.max(0, 1 - Math.abs(pos - k)));
+            place(current + frac);
         }
 
         public void animateTo(int page) {
-            final float from = current + (-row.getTranslationX() == offsetFor(current) ? 0 : 0);
-            current = page;
             if (anim != null) anim.cancel();
-            android.animation.ValueAnimator va = android.animation.ValueAnimator.ofFloat(0, 1);
+            float from = row.getChildCount() == 0 || getWidth() == 0 ? page : posOfPill();
+            current = page;
+            android.animation.ValueAnimator va = android.animation.ValueAnimator.ofFloat(from, page);
             anim = va;
-            final float startX = row.getTranslationX(), endX = -offsetFor(page);
-            final int pg = page;
-            va.setDuration(450);
-            va.setInterpolator(new android.view.animation.DecelerateInterpolator(2.5f));
+            va.setDuration(260);
+            va.setInterpolator(new android.view.animation.DecelerateInterpolator(2f));
             va.addUpdateListener(new android.animation.ValueAnimator.AnimatorUpdateListener() {
-                public void onAnimationUpdate(android.animation.ValueAnimator a) {
-                    float v = (Float) a.getAnimatedValue();
-                    row.setTranslationX(startX + (endX - startX) * v);
-                    for (int k = 0; k < row.getChildCount(); k++)
-                        row.getChildAt(k).setAlpha(v < 1 ? row.getChildAt(k).getAlpha() + ((k == pg ? 1f : 0.35f) - row.getChildAt(k).getAlpha()) * v : (k == pg ? 1f : 0.35f));
-                }
+                public void onAnimationUpdate(android.animation.ValueAnimator a) { place((Float) a.getAnimatedValue()); }
             });
             va.start();
+        }
+
+        /** Current pill position in pages (for smooth hand-over from a drag to the settle animation). */
+        private float posOfPill() {
+            float x = pill.getTranslationX() - row.getTranslationX() + pill.getWidth() / 2f;
+            int n = row.getChildCount();
+            for (int i = 0; i < n - 1; i++) {
+                View a = row.getChildAt(i), b = row.getChildAt(i + 1);
+                float ca = a.getLeft() + a.getWidth() / 2f, cb = b.getLeft() + b.getWidth() / 2f;
+                if (x <= cb) return i + Math.max(0, Math.min(1, (x - ca) / Math.max(1, cb - ca)));
+            }
+            return n - 1;
         }
     }
 
@@ -826,14 +850,17 @@ public final class Ui {
         final android.app.Dialog d = new android.app.Dialog(a, dark ? R.style.MetroDialogDark : R.style.MetroDialogLight);
         d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
         LinearLayout l = vertical(a);
-        l.setBackgroundColor(dark ? blend(0xFF000000, ACCENT, 0.12f) : blend(0xFFFFFFFF, ACCENT, 0.08f));
-        l.setPadding(0, dp(a, 14), 0, dp(a, 18));
+        l.setBackground(stroke(SURFACE2, dark ? 0x33000000 : 0x1A000000, Math.max(1, dp(a, 1)), dp(a, R_CARD)));
+        l.setElevation(dp(a, 16));
+        l.setPadding(dp(a, 4), dp(a, 4), dp(a, 4), dp(a, 4));
         for (int i = 0; i < items.length; i++) {
             final int idx = i;
-            TextView t = text(a, items[i].toLowerCase(), 21, TEXT, false);
-            t.setPadding(dp(a, 24), dp(a, 11), dp(a, 24), dp(a, 11));
+            TextView t = text(a, items[i], 15, TEXT, false);
+            t.setMinHeight(dp(a, 40));
+            t.setGravity(Gravity.CENTER_VERTICAL);
+            t.setPadding(dp(a, 12), dp(a, 8), dp(a, 32), dp(a, 8));
+            t.setBackground(pressable(a, null, dp(a, R_CONTROL)));
             t.setClickable(true);
-            tilt(t);
             t.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
                     d.dismiss();
@@ -842,12 +869,21 @@ public final class Ui {
             });
             l.addView(t, lp(MATCH, WRAP));
         }
-        d.setContentView(l);
+        FrameLayout pad = new FrameLayout(a);
+        pad.setPadding(dp(a, 12), dp(a, 12), dp(a, 12), dp(a, 12));
+        pad.setClipToPadding(false);
+        pad.addView(l, new FrameLayout.LayoutParams(WRAP, WRAP));
+        d.setContentView(pad);
         frame(d);
         if (d.getWindow() != null) {
-            d.getWindow().setGravity(Gravity.BOTTOM);
+            d.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
+            d.getWindow().setDimAmount(0f);
+            d.getWindow().setGravity(Gravity.BOTTOM | Gravity.END);
             d.getWindow().setWindowAnimations(R.style.MetroBottomAnim);
-            d.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            d.getWindow().setLayout(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            android.view.WindowManager.LayoutParams wl = d.getWindow().getAttributes();
+            wl.y = dp(a, 56); // just above the command bar
+            d.getWindow().setAttributes(wl);
         }
         d.show();
     }
@@ -864,10 +900,12 @@ public final class Ui {
         final AlertDialog d = b.create();
         for (int i = 0; i < items.length; i++) {
             final int idx = i;
-            TextView t = text(c, items[i].toLowerCase(), 21, i == selected ? ACCENT : TEXT, false);
-            t.setPadding(dp(c, 24), dp(c, 10), dp(c, 24), dp(c, 10));
+            TextView t = text(c, (i == selected ? "\u2713  " : "     ") + items[i], 15, i == selected ? ACCENT : TEXT, i == selected);
+            t.setMinHeight(dp(c, 40));
+            t.setGravity(Gravity.CENTER_VERTICAL);
+            t.setPadding(dp(c, 16), dp(c, 8), dp(c, 16), dp(c, 8));
+            t.setBackground(pressable(c, null, dp(c, R_CONTROL)));
             t.setClickable(true);
-            tilt(t);
             t.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
                     d.dismiss();
@@ -893,25 +931,25 @@ public final class Ui {
         return s;
     }
 
-    /** Pivot header: big thin lowercase word; the current one is bright, the others faded. */
+    /** Fluent pill toggle. */
     public static TextView chip(Context c, String label, boolean selected, View.OnClickListener l) {
-        TextView t = text(c, label.toLowerCase(), 24, TEXT, false);
-        t.setTypeface(LIGHT);
-        t.setAlpha(selected ? 1f : 0.4f);
-        t.setPadding(dp(c, 2), 0, dp(c, 18), dp(c, 2));
+        TextView t = text(c, label, 14, selected ? ON_ACCENT : TEXT, selected);
+        t.setPadding(dp(c, 14), dp(c, 6), dp(c, 14), dp(c, 6));
         t.setSingleLine(true);
+        t.setBackground(pressable(c, selected ? round(ACCENT, dp(c, 16)) : stroke(SURFACE2, DIVIDER, Math.max(1, dp(c, 1)), dp(c, 16)), dp(c, 16)));
         t.setOnClickListener(l);
         t.setClickable(true);
         LinearLayout.LayoutParams p = lp(WRAP, WRAP);
+        p.setMargins(0, 0, dp(c, 6), 0);
         t.setLayoutParams(p);
         return t;
     }
 
-    /** Root: black (or white) with an accent glow at the top, page content, and the bottom application bar. */
+    /** Root: Mica-like background (a faint wash of the accent), page content, and the command bar at the bottom. */
     public static LinearLayout screen(Activity a) {
         LinearLayout outer = vertical(a);
         GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{
-                blend(BG, ACCENT, dark ? 0.36f : 0.22f), blend(BG, ACCENT, dark ? 0.10f : 0.06f), BG, BG});
+                blend(BG, ACCENT, 0.06f), BG, BG});
         outer.setBackground(g);
         outer.setFitsSystemWindows(true);
         outer.setFilterTouchesWhenObscured(true); // ignore taps while another app draws over us (tapjacking)
@@ -919,8 +957,15 @@ public final class Ui {
         outer.addView(content, new LinearLayout.LayoutParams(MATCH, 0, 1));
         LinearLayout bar = horizontal(a);
         bar.setTag("grove_appbar");
-        bar.setMinimumHeight(dp(a, 62));
-        bar.setBackgroundColor(dark ? blend(0xFF000000, ACCENT, 0.12f) : blend(0xFFFFFFFF, ACCENT, 0.08f));
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setMinimumHeight(dp(a, 56));
+        bar.setPadding(dp(a, 8), dp(a, 6), dp(a, 8), dp(a, 6));
+        GradientDrawable bb = new GradientDrawable();
+        bb.setColor(dark ? 0xFF1C1C1C : 0xFFFAFAFA);
+        android.graphics.drawable.LayerDrawable top = new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{bb, round(DIVIDER, 0)});
+        top.setLayerGravity(1, Gravity.TOP | Gravity.FILL_HORIZONTAL);
+        top.setLayerHeight(1, Math.max(1, dp(a, 1)));
+        bar.setBackground(top);
         bar.setVisibility(View.GONE);
         outer.addView(bar, lp(MATCH, WRAP));
         a.setContentView(outer);
@@ -958,39 +1003,42 @@ public final class Ui {
             }
         };
         if (title != null) {
-            TextView t = text(c, title.toLowerCase(), 26, TEXT, false);
-            t.setTypeface(LIGHT);
-            t.setPadding(dp(c, 24), dp(c, 22), dp(c, 24), dp(c, 6));
+            TextView t = text(c, title, 20, TEXT, true);
+            t.setPadding(dp(c, 24), dp(c, 24), dp(c, 24), dp(c, 8));
             b.setCustomTitle(t);
         }
         return b;
     }
 
-    /** Full-width at the top, and hidden from screenshots/recordings like the rest of the app. */
+    /** Centred (Fluent ContentDialog), and hidden from screenshots/recordings like the rest of the app. */
     static void frame(android.app.Dialog d) {
         if (d.getWindow() == null) return;
-        d.getWindow().setGravity(Gravity.TOP);
-        d.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        d.getWindow().setGravity(Gravity.CENTER);
+        int w = d.getContext().getResources().getDisplayMetrics().widthPixels;
+        d.getWindow().setLayout(Math.min(w - dp(d.getContext(), 32), dp(d.getContext(), 480)), ViewGroup.LayoutParams.WRAP_CONTENT);
         if (!Prefs.allowScreenshots(d.getContext())) d.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
     }
 
     static void metro(AlertDialog d) {
-        for (int w : new int[]{DialogInterface.BUTTON_POSITIVE, DialogInterface.BUTTON_NEGATIVE, DialogInterface.BUTTON_NEUTRAL}) {
+        Context c = d.getContext();
+        if (d.getWindow() != null)
+            d.getWindow().setBackgroundDrawable(stroke(SURFACE2, dark ? 0x33000000 : 0x1A000000, Math.max(1, dp(c, 1)), dp(c, R_CARD)));
+        int[] which = {DialogInterface.BUTTON_POSITIVE, DialogInterface.BUTTON_NEGATIVE, DialogInterface.BUTTON_NEUTRAL};
+        for (int w : which) {
             android.widget.Button btn = d.getButton(w);
-            if (btn == null) continue;
+            if (btn == null || btn.getVisibility() != View.VISIBLE) continue;
+            boolean primary = w == DialogInterface.BUTTON_POSITIVE;
             btn.setAllCaps(false);
-            btn.setText(btn.getText().toString().toLowerCase());
-            btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
-            btn.setTextColor(TEXT);
-            // border drawn inset inside the button's own bounds, so the button bar can never clip an edge
-            int in = dp(d.getContext(), 5), sw = dp(d.getContext(), 2);
-            android.graphics.drawable.StateListDrawable st = new android.graphics.drawable.StateListDrawable();
-            st.addState(new int[]{android.R.attr.state_pressed}, new android.graphics.drawable.InsetDrawable(stroke(ACCENT, ACCENT, sw, 0), in));
-            st.addState(new int[]{}, new android.graphics.drawable.InsetDrawable(stroke(0, TEXT, sw, 0), in));
-            btn.setBackground(st);
-            btn.setMinWidth(dp(d.getContext(), 104));
-            btn.setMinHeight(dp(d.getContext(), 52));
-            btn.setPadding(dp(d.getContext(), 18), 0, dp(d.getContext(), 18), 0);
+            btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+            btn.setTypeface(primary ? SEMI : Typeface.DEFAULT);
+            btn.setTextColor(primary ? ON_ACCENT : TEXT);
+            int in = dp(c, 4);
+            android.graphics.drawable.Drawable bgd = primary ? round(ACCENT, dp(c, R_CONTROL))
+                    : stroke(dark ? 0xFF3A3A3A : 0xFFFBFBFB, DIVIDER, Math.max(1, dp(c, 1)), dp(c, R_CONTROL));
+            btn.setBackground(new android.graphics.drawable.InsetDrawable(pressable(c, bgd, dp(c, R_CONTROL)), in));
+            btn.setMinWidth(dp(c, 96));
+            btn.setMinHeight(dp(c, 48));
+            btn.setPadding(dp(c, 18), 0, dp(c, 18), 0);
         }
     }
 
@@ -1050,7 +1098,7 @@ public final class Ui {
     @SuppressWarnings("deprecation")
     public static <T> void bg(final Activity a, String message, final Task<T> task, final Cb<T> done, final Cb<Exception> failed) {
         final ProgressDialog pd = new ProgressDialog(a, dark ? R.style.MetroDialogDark : R.style.MetroDialogLight);
-        pd.setMessage(message.toLowerCase());
+        pd.setMessage(message);
         pd.setCancelable(false);
         pd.create();
         frame(pd);

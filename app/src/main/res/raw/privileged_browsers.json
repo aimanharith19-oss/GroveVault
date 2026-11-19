@@ -982,18 +982,6 @@
      }
     ]
    }
-  },
-  {
-    "type": "android",
-    "info": {
-      "package_name": "app.grove.browser",
-      "signatures": [
-        {
-          "build": "release",
-          "cert_fingerprint_sha256": "88:62:75:F0:89:84:E1:09:B8:56:23:10:A7:DE:E4:67:EA:C4:1C:6F:BD:D2:12:66:F7:37:FB:CD:12:A3:B7:99"
-        }
-      ]
-    }
   }
  ]
 }
