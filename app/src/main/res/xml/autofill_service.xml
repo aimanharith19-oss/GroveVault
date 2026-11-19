@@ -8,6 +8,7 @@
     <compatibility-package android:name="com.microsoft.emmx" android:maxLongVersionCode="10000000000" />
     <compatibility-package android:name="com.opera.browser" android:maxLongVersionCode="10000000000" />
     <compatibility-package android:name="com.vivaldi.browser" android:maxLongVersionCode="10000000000" />
+    <compatibility-package android:name="com.vivaldi.browser.snapshot" android:maxLongVersionCode="10000000000" />
     <compatibility-package android:name="com.sec.android.app.sbrowser" android:maxLongVersionCode="10000000000" />
     <compatibility-package android:name="com.duckduckgo.mobile.android" android:maxLongVersionCode="10000000000" />
     <compatibility-package android:name="org.bromite.bromite" android:maxLongVersionCode="10000000000" />

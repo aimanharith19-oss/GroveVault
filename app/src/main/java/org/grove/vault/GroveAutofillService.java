@@ -43,7 +43,9 @@ public class GroveAutofillService extends AutofillService {
             AutofillParser p = AutofillParser.parse(this, s);
             // Any text field only when the user asks (long-press → Autofill); otherwise only real login forms.
             if ((request.getFlags() & FillRequest.FLAG_MANUAL_REQUEST) != 0) p.fallbackAnyField();
-            if (getPackageName().equals(p.packageName) || !p.any()) {
+            boolean manual = (request.getFlags() & FillRequest.FLAG_MANUAL_REQUEST) != 0;
+            // paused from the Quick Settings pill (a manual long-press → Autofill still works)
+            if (getPackageName().equals(p.packageName) || !p.any() || (AutofillTile.paused(this) && !manual)) {
                 callback.onSuccess(null);
                 return;
             }
@@ -234,7 +236,7 @@ public class GroveAutofillService extends AutofillService {
             AssistStructure s = ctx.get(ctx.size() - 1).getStructure();
             AutofillParser p = AutofillParser.parse(this, s);
             String pass = p.passValue;
-            if (pass == null || pass.length() == 0 || neverSave(this, p)) {
+            if (pass == null || pass.length() == 0 || neverSave(this, p) || AutofillTile.paused(this)) {
                 callback.onSuccess();
                 return;
             }

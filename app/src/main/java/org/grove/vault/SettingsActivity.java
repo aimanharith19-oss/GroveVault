@@ -96,6 +96,23 @@ public class SettingsActivity extends BaseActivity {
 
         // ---------------- autofill
         c.addView(Ui.section(this, "Autofill"));
+        if (android.os.Build.VERSION.SDK_INT >= 33) c.addView(Ui.row(this, "Add Quick Settings pill", "A \"Grove autofill\" pill in your notification shade: turns autofill on, or pauses it", new View.OnClickListener() {
+            public void onClick(View v) {
+                try {
+                    android.app.StatusBarManager sb = getSystemService(android.app.StatusBarManager.class);
+                    sb.requestAddTileService(new android.content.ComponentName(SettingsActivity.this, AutofillTile.class), "Grove autofill",
+                            android.graphics.drawable.Icon.createWithResource(SettingsActivity.this, R.drawable.ic_key), getMainExecutor(),
+                            new java.util.function.Consumer<Integer>() {
+                                public void accept(Integer r) {
+                                    if (r == android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED) Ui.toast(SettingsActivity.this, "Added. Find it in Quick Settings");
+                                    else if (r == android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED) Ui.toast(SettingsActivity.this, "Already in Quick Settings");
+                                }
+                            });
+                } catch (Exception e) {
+                    Ui.toast(SettingsActivity.this, "Pull down Quick Settings, tap the pencil and drag \"Grove autofill\" in");
+                }
+            }
+        }));
         boolean on = false;
         try {
             AutofillManager am = getSystemService(AutofillManager.class);
